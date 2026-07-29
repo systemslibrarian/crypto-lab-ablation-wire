@@ -15,27 +15,50 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        features: ["default", "pq", "classical,pq"]
+        features: ["default", "classical", "pq", "classical,pq"]
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
       - uses: Swatinem/rust-cache@v2
 
-      - name: Build
+      # Every leg of this matrix builds, tests *and* lints. The `pq` leg in
+      # particular had never compiled: `Identity` was gated on `classical`
+      # while the handshake used it unconditionally, so a pure post-quantum
+      # build had no signature scheme at all. A matrix that only ever built
+      # the combination the author happened to run locally is not a matrix.
+      - name: Flags
+        id: flags
         run: |
           if [ "${{ matrix.features }}" = "default" ]; then
-            cargo build -p codetalker-core
+            echo 'args=' >> "$GITHUB_OUTPUT"
           else
-            cargo build -p codetalker-core --no-default-features --features "${{ matrix.features }}"
+            echo 'args=--no-default-features --features ${{ matrix.features }}' >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Known-answer tests
-        run: |
-          if [ "${{ matrix.features }}" = "default" ]; then
-            cargo test -p codetalker-core
-          else
-            cargo test -p codetalker-core --no-default-features --features "${{ matrix.features }}"
-          fi
+      - name: Fetch known-answer vectors
+        run: .github/fetch-vectors.sh
+
+      - run: cargo build -p codetalker-core ${{ steps.flags.outputs.args }}
+      - run: cargo test -p codetalker-core ${{ steps.flags.outputs.args }} -- --nocapture
+      - run: cargo clippy -p codetalker-core --all-targets ${{ steps.flags.outputs.args }} -- -D warnings
+
+  msrv:
+    name: MSRV ${{ matrix.rust }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        rust: ["1.85"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
+      # The README pins this. A pinned MSRV nobody compiles against is a guess.
+      - run: cargo build -p codetalker-core --no-default-features --features classical,pq
 
   lint:
     runs-on: ubuntu-latest
@@ -82,6 +105,19 @@ jobs:
         with:
           command: check advisories bans licenses sources
 
+  audit:
+    name: rustsec advisories
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install cargo-audit --locked
+      # `cargo deny check advisories` reads the same database, but only for the
+      # workspace. This also covers codetalker-wasm, which is excluded from it
+      # and is the crate the browser actually runs.
+      - run: cargo audit
+      - run: cargo audit --file codetalker-wasm/Cargo.lock
+
   cbom:
     name: cryptographic bill of materials
     runs-on: ubuntu-latest
@@ -117,20 +153,14 @@ jobs:
       # Short run on every PR; the corpus grows via scheduled long runs.
       - run: cargo fuzz run deobfuscate -- -max_total_time=60
 
-  mlkem-vectors:
-    name: FIPS 203 known-answer tests
+  nist-vectors:
+    name: FIPS 203 / 204 known-answer tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
       - name: Fetch ACVP vectors
-        # internalProjection.json, not prompt.json. The prompt file carries the
-        # inputs and no expected answers, so a test fed that file can check the
-        # implementation does not crash and nothing else.
-        run: |
-          mkdir -p codetalker-core/tests/vectors
-          curl -fsSL -o codetalker-core/tests/vectors/mlkem768.json \
-            https://raw.githubusercontent.com/usnistgov/ACVP-Server/master/gen-val/json-files/ML-KEM-encapDecap-FIPS203/internalProjection.json
+        run: .github/fetch-vectors.sh
       - run: cargo test -p codetalker-core --features pq --test kat -- --nocapture
 
   deploy:

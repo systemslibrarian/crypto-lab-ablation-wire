@@ -3,14 +3,27 @@
 //! Each test encodes a claim the demo makes in prose. If a claim stops being
 //! true, CI says so before a reader does.
 
-use codetalker_core::identity::Identity;
+use codetalker_core::identity::{Identity, SigSuite};
 use codetalker_core::kem::{self, Kem};
 use codetalker_core::session::{self, two_time_pad, Layers, Recovery};
 use codetalker_core::{aead, handshake, ratchet, transport};
 
+/// The real KEM this build contains. Not hardcoded to x25519: under
+/// `--no-default-features --features pq` there is no x25519, and a test suite
+/// that assumes one feature set silently stops covering the others.
 fn k() -> Box<dyn Kem> {
-    kem::backend("x25519").expect("classical is on by default")
+    kem::backend(KEM_ID).expect("KEM_ID names a backend this build compiled in")
 }
+
+#[cfg(feature = "classical")]
+const KEM_ID: &str = "x25519";
+#[cfg(all(not(feature = "classical"), feature = "pq"))]
+const KEM_ID: &str = "xwing";
+
+#[cfg(feature = "classical")]
+const KEM_LABEL: &str = "DHKEM(X25519)";
+#[cfg(all(not(feature = "classical"), feature = "pq"))]
+const KEM_LABEL: &str = "X-Wing (X25519 + ML-KEM-768)";
 const SUITE: aead::Suite = aead::Suite::Aes256Gcm;
 
 // ---------------------------------------------------------------------------
@@ -346,7 +359,7 @@ fn nonce_reuse_with_a_ratchet_yields_no_pad_at_all() {
 #[test]
 fn key_agreement_off_names_the_kem_the_channel_actually_used() {
     let kem = k();
-    assert_eq!(kem.name(), "DHKEM(X25519)");
+    assert_eq!(kem.name(), KEM_LABEL);
 
     // Switching key agreement off does not mean "run X25519 and pretend": the
     // channel is rebuilt on a fixed secret, and says so.
@@ -355,7 +368,7 @@ fn key_agreement_off_names_the_kem_the_channel_actually_used() {
     assert_eq!(a.hs.kem_name, "static (captured codebook)");
 
     let (b, _) = session::establish(&*kem, Layers::default(), SUITE).unwrap();
-    assert_eq!(b.hs.kem_name, "DHKEM(X25519)");
+    assert_eq!(b.hs.kem_name, KEM_LABEL);
 }
 
 #[test]
@@ -413,6 +426,71 @@ fn pinning_leaves_no_room_for_a_machine_in_the_middle() {
 }
 
 // ---------------------------------------------------------------------------
+// Signature suite negotiation. Algorithm agility is a downgrade oracle unless
+// the negotiated algorithm is bound into what gets signed.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn announced_signature_suite_is_covered_by_the_signature() {
+    let kem = k();
+    let responder = handshake::Responder::new(&*kem, Identity::generate()).unwrap();
+    let pinned = responder.identity_public();
+    let mut hello = responder.hello();
+
+    // Rewrite only the announced suite, leaving key and signature untouched —
+    // the shape of a downgrade attempt. The suite is absorbed into the
+    // transcript the signature covers, so the hash moves and verification
+    // fails closed rather than falling back to something weaker.
+    hello.sig_suite = match hello.sig_suite {
+        SigSuite::Ed25519 => SigSuite::MlDsa65,
+        SigSuite::MlDsa65 => SigSuite::Ed25519,
+    };
+
+    assert!(handshake::initiate(&*kem, &hello, true, Some(&pinned)).is_err());
+}
+
+#[test]
+fn identity_reports_its_suite_and_quantum_resistance_truthfully() {
+    let id = Identity::generate();
+    let suite = id.suite();
+
+    assert!(
+        suite.is_available(),
+        "generate() must not name an uncompiled suite"
+    );
+    assert_eq!(SigSuite::from_name(suite.name()).unwrap(), suite);
+
+    // is_pq is a property of the algorithm, not of the build's ambitions.
+    assert_eq!(suite.is_pq(), suite == SigSuite::MlDsa65);
+    #[cfg(feature = "pq")]
+    assert_eq!(
+        suite,
+        SigSuite::MlDsa65,
+        "a pq build must authenticate with ML-DSA"
+    );
+    #[cfg(all(not(feature = "pq"), feature = "classical"))]
+    assert_eq!(suite, SigSuite::Ed25519);
+}
+
+#[test]
+fn a_session_is_only_fully_pq_when_both_halves_are() {
+    let kem = k();
+    let responder = handshake::Responder::new(&*kem, Identity::generate()).unwrap();
+    let pinned = responder.identity_public();
+    let (hs, _) = handshake::initiate(&*kem, &responder.hello(), true, Some(&pinned)).unwrap();
+
+    // A hybrid KEM under a classical signature is post-quantum for
+    // confidentiality and not for authentication. One flag for the session
+    // would hide precisely that.
+    assert_eq!(hs.is_fully_pq(), hs.kem_is_pq && hs.sig_suite.is_pq());
+
+    #[cfg(all(feature = "pq", not(feature = "classical")))]
+    assert!(hs.is_fully_pq(), "a pq-only build should be pq on both halves");
+    #[cfg(all(feature = "classical", not(feature = "pq")))]
+    assert!(!hs.is_fully_pq(), "a classical build is not post-quantum");
+}
+
+// ---------------------------------------------------------------------------
 // Feature honesty.
 // ---------------------------------------------------------------------------
 
@@ -427,6 +505,7 @@ fn pq_backend_reports_honestly_when_absent() {
 
 #[test]
 fn kem_reports_its_own_pq_status_truthfully() {
+    #[cfg(feature = "classical")]
     assert!(!kem::backend("x25519").unwrap().is_pq());
     assert!(!kem::backend("static").unwrap().is_pq());
     #[cfg(feature = "pq")]

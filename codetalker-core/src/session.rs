@@ -71,8 +71,19 @@ pub struct Channel {
 pub struct Frame {
     pub wire: Vec<u8>,
     pub nonce: [u8; NONCE_LEN],
+    /// The key this frame was sealed under. Exposed because the ablation
+    /// harness and the demo both need to *show* it — that a fresh key appears
+    /// per message is the ratchet's entire observable claim. It is still key
+    /// material, so it is wiped when the frame goes out of scope.
     pub message_key: [u8; 32],
     pub counter: u32,
+}
+
+impl Drop for Frame {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        self.message_key.zeroize();
+    }
 }
 
 pub const PAD_BLOCK: usize = 64;

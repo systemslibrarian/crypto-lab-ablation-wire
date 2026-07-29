@@ -23,13 +23,18 @@
 //! data, so splicing messages between sessions fails the tag check.
 
 use crate::error::{Error, Result};
-use crate::identity::{self, Identity};
+use crate::identity::{self, Identity, SigSuite};
 use crate::kdf;
 use crate::kem::{Ciphertext, Kem, PublicKey, SecretKey};
 use crate::transcript::Transcript;
 
 #[derive(Clone, Debug)]
 pub struct ResponderHello {
+    /// Which signature suite the responder used. Announced, and therefore
+    /// attacker-editable — which is why it is absorbed into the transcript the
+    /// signature covers. Editing it changes the hash and the signature stops
+    /// verifying, so a downgrade cannot be forced by rewriting one field.
+    pub sig_suite: SigSuite,
     pub identity_pk: Vec<u8>,
     pub kem_pk: PublicKey,
     pub signature: Vec<u8>,
@@ -46,7 +51,28 @@ pub struct Handshake {
     pub transcript_hash: [u8; 32],
     pub kem_name: &'static str,
     pub kem_is_pq: bool,
+    pub sig_suite: SigSuite,
     pub authenticated: bool,
+}
+
+/// The session root is key material and is wiped on drop, like every other
+/// secret in this crate. `transcript_hash` is public and deliberately left
+/// alone — it is bound into each AEAD as associated data, not kept secret.
+impl Drop for Handshake {
+    fn drop(&mut self) {
+        use zeroize::Zeroize;
+        self.root.zeroize();
+    }
+}
+
+impl Handshake {
+    /// Whether *both* halves resist a quantum adversary. A hybrid KEM with a
+    /// classical signature is post-quantum for confidentiality and not for
+    /// authentication; reporting a single `is_pq` for the session would paper
+    /// over exactly that distinction.
+    pub fn is_fully_pq(&self) -> bool {
+        self.kem_is_pq && self.sig_suite.is_pq()
+    }
 }
 
 fn base_transcript(kem: &dyn Kem) -> Transcript {
@@ -70,14 +96,18 @@ impl<'a> Responder<'a> {
 
         let mut transcript = base_transcript(kem);
         let identity_pk = identity.public();
+        let sig_suite = identity.suite();
+        // Absorbed before signing, so the suite is covered by the signature.
+        // Algorithm agility without this is a downgrade oracle.
+        transcript.absorb(b"sig_suite", sig_suite.name().as_bytes());
         transcript.absorb(b"id_pk", &identity_pk);
         transcript.absorb(b"kem_pk", kem_pk.as_bytes());
 
         // Sign the transcript, not the raw key. Signing the key alone would
         // leave the signature replayable into a different session.
-        let signature = identity.sign(&transcript.hash());
+        let signature = identity.sign(&transcript.hash())?;
 
-        let hello = ResponderHello { identity_pk, kem_pk, signature };
+        let hello = ResponderHello { sig_suite, identity_pk, kem_pk, signature };
         Ok(Responder { kem, identity, kem_sk, hello, transcript })
     }
 
@@ -108,6 +138,7 @@ impl<'a> Responder<'a> {
             transcript_hash: th,
             kem_name: self.kem.name(),
             kem_is_pq: self.kem.is_pq(),
+            sig_suite: self.hello.sig_suite,
             authenticated,
         })
     }
@@ -125,6 +156,7 @@ pub fn initiate(
     expected_identity: Option<&[u8]>,
 ) -> Result<(Handshake, InitiatorReply)> {
     let mut transcript = base_transcript(kem);
+    transcript.absorb(b"sig_suite", hello.sig_suite.name().as_bytes());
     transcript.absorb(b"id_pk", &hello.identity_pk);
     transcript.absorb(b"kem_pk", hello.kem_pk.as_bytes());
 
@@ -135,7 +167,19 @@ pub fn initiate(
                 return Err(Error::Auth("identity key does not match the pinned peer"));
             }
         }
-        identity::verify(&hello.identity_pk, &transcript.hash(), &hello.signature)?;
+        // A suite this build cannot verify must be refused outright. Carrying
+        // on would mean accepting a peer whose signature was never checked.
+        if !hello.sig_suite.is_available() {
+            return Err(Error::BackendUnavailable(
+                "the peer's signature suite is not compiled into this build",
+            ));
+        }
+        identity::verify(
+            hello.sig_suite,
+            &hello.identity_pk,
+            &transcript.hash(),
+            &hello.signature,
+        )?;
     }
 
     let (ss, ct) = kem.encapsulate(&hello.kem_pk)?;
@@ -156,6 +200,7 @@ pub fn initiate(
             transcript_hash: th,
             kem_name: kem.name(),
             kem_is_pq: kem.is_pq(),
+            sig_suite: hello.sig_suite,
             authenticated: verify_identity,
         },
         InitiatorReply { ct },

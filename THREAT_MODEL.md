@@ -37,6 +37,20 @@ Defeated only under `--features pq`, where the X-Wing hybrid holds if *either*
 component survives. The default `classical` build does **not** defend against
 A4, and says so at runtime through `Kem::is_pq()`.
 
+A4 splits in two, and the split is worth stating because it is easy to sell one
+half as both. *Confidentiality* against A4 is a harvest-now-decrypt-later
+problem: the hybrid KEM solves it, because the recording is useless without a
+break of both components. *Authentication* against A4 is not a recording
+problem at all — a forgery has to be produced during the handshake, while the
+session is live. A quantum adversary who arrives in 2040 cannot retroactively
+have been in the middle of a 2026 handshake.
+
+So `pq` with a classical signature would still defeat A4 in the sense that
+matters for recorded traffic. It is wired to ML-DSA-65 anyway, because a build
+labelled post-quantum whose signatures are Ed25519 will be read as more than it
+is. `Handshake::is_fully_pq()` requires both halves, and the demo shows two
+badges rather than one.
+
 **A5 — local side-channel observer.** Measures timing or cache behaviour on the
 same machine. **Not defended against.** See Limitations.
 

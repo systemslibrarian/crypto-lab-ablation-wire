@@ -213,6 +213,26 @@ impl Kem for XWingKem {
     }
 }
 
+/// Raw X25519 scalar multiplication, for the RFC 7748 known-answer tests.
+///
+/// Not part of the [`Kem`] surface — `DHKEM(X25519)` is what the session layer
+/// uses. This exposes the underlying curve operation so the vectors in §5.2
+/// and §6.1 check the same implementation the KEM is built on, rather than a
+/// second copy that might not be the one actually in use.
+#[cfg(feature = "classical")]
+pub fn x25519_raw(scalar: &[u8], point: &[u8]) -> Result<[u8; 32]> {
+    let k: [u8; 32] = scalar.try_into().map_err(|_| Error::Kem("bad scalar length"))?;
+    let u: [u8; 32] = point.try_into().map_err(|_| Error::Kem("bad point length"))?;
+    Ok(x25519_dalek::x25519(k, u))
+}
+
+/// X25519 against the curve basepoint: the public key for a secret scalar.
+#[cfg(feature = "classical")]
+pub fn x25519_base(scalar: &[u8]) -> Result<[u8; 32]> {
+    let k: [u8; 32] = scalar.try_into().map_err(|_| Error::Kem("bad scalar length"))?;
+    Ok(x25519_dalek::PublicKey::from(&x25519_dalek::StaticSecret::from(k)).to_bytes())
+}
+
 /// Raw ML-KEM-768 decapsulation, for the FIPS 203 known-answer tests.
 ///
 /// X-Wing is X25519 combined with ML-KEM-768, so this exercises the

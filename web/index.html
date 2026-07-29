@@ -669,8 +669,17 @@ function buildBadges() {
 
   const pqBadge = document.createElement("span");
   pqBadge.className = "badge " + (pq ? "on" : "off");
-  pqBadge.textContent = pq ? "post-quantum: X-Wing compiled in" : "post-quantum: not compiled in";
+  pqBadge.textContent = pq ? "post-quantum KEM: X-Wing" : "post-quantum KEM: not compiled in";
   wrap.appendChild(pqBadge);
+
+  // Confidentiality and authentication are separate post-quantum questions.
+  // One combined badge would let a hybrid KEM under an Ed25519 signature read
+  // as fully post-quantum, which it is not.
+  const sigBadge = document.createElement("span");
+  sigBadge.id = "sig-badge";
+  sigBadge.className = "badge";
+  sigBadge.textContent = "signatures: —";
+  wrap.appendChild(sigBadge);
 
   const blockBadge = document.createElement("span");
   blockBadge.className = "badge";
@@ -954,8 +963,14 @@ function renderReceiver(r) {
 function renderFacts(r, cfg) {
   const substituted = r.kem !== r.kemRequested;
   const rows = [
-    ["KEM in force", r.kem + (r.isPq ? "  · post-quantum" : "")],
+    ["KEM in force", r.kem + (r.isPq ? "  · post-quantum" : "  · not post-quantum")],
     substituted ? ["KEM requested", r.kemRequested + "  · overridden, no agreement to make"] : null,
+    ["Signature suite", r.sigSuite + (r.sigIsPq ? "  · post-quantum" : "  · not post-quantum")],
+    ["Quantum resistance", r.fullyPq
+      ? "both halves — confidentiality and authentication"
+      : r.isPq
+        ? "confidentiality only — a recorded session stays sealed, but the signature is forgeable by a quantum adversary"
+        : "neither half"],
     ["AEAD suite", r.suite],
     ["Peer authenticated", r.authenticated ? "yes, pinned identity" : "no — any signer accepted"],
     ["Transcript hash", r.transcriptHash],
@@ -980,6 +995,12 @@ function renderFacts(r, cfg) {
   $("backend-hint").textContent = substituted
     ? "Ignored: with key agreement off the channel is rebuilt on a fixed secret."
     : "";
+
+  const sigBadge = $("sig-badge");
+  if (sigBadge) {
+    sigBadge.className = "badge " + (r.sigIsPq ? "on" : "off");
+    sigBadge.textContent = `signatures: ${r.sigSuite}${r.sigIsPq ? "" : " (classical)"}`;
+  }
 }
 
 boot();

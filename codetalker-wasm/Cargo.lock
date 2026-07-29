@@ -190,6 +190,7 @@ dependencies = [
  "ed25519-dalek",
  "hkdf",
  "libcrux-kem",
+ "libcrux-ml-dsa",
  "rand_core 0.10.1",
  "rand_core 0.6.4",
  "sha2",
@@ -609,6 +610,22 @@ checksum = "ffd6aa2dcd5be681662001b81d493f1569c6d49a32361f470b0c955465cd0338"
 dependencies = [
  "quote",
  "syn 2.0.119",
+]
+
+[[package]]
+name = "libcrux-ml-dsa"
+version = "0.0.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "783ebed7cb27de6d44ef2aa662648d1a0869694f2f754f2f1ed45e959ef3b48e"
+dependencies = [
+ "core-models",
+ "hax-lib",
+ "libcrux-intrinsics",
+ "libcrux-macros",
+ "libcrux-platform",
+ "libcrux-secrets",
+ "libcrux-sha3",
+ "tls_codec",
 ]
 
 [[package]]

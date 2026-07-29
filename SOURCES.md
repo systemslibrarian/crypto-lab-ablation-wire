@@ -38,8 +38,9 @@ technical feature in this repository.
 | RFC 9180 §4.1 | DHKEM(X25519) construction |
 | RFC 8439 §2.8.2 | ChaCha20-Poly1305 and its KAT vector |
 | NIST SP 800-38D | AES-GCM; TC13/TC14 vectors via McGrew & Viega |
+| RFC 7748 | X25519, and the §5.2 / §6.1 KAT vectors |
 | FIPS 203 | ML-KEM-768 |
-| FIPS 204 | ML-DSA (planned; not yet wired) |
+| FIPS 204 | ML-DSA-65, peer authentication under `pq` |
 | draft-connolly-cfrg-xwing-kem | X-Wing hybrid, via `libcrux-kem` |
 | RFC 8032 | Ed25519 |
 
@@ -48,7 +49,15 @@ technical feature in this repository.
 RFC 5869, RFC 8439 and NIST GCM vectors are transcribed inline in
 `tests/kat.rs` and verified on every CI run.
 
-FIPS 203 ACVP vectors are **not** vendored. `tests/kat.rs` looks for
-`tests/vectors/mlkem768.json` and **fails loudly** when it is absent rather than
-skipping — a silently skipped known-answer test is worse than none, because it
-reads as a pass.
+RFC 7748 and RFC 8032 vectors are transcribed inline alongside them, so the
+asymmetric primitives carrying key agreement and authentication in the default
+build are checked against their specifications and not merely against
+themselves.
+
+NIST ACVP vectors are **not** vendored. `.github/fetch-vectors.sh` retrieves
+them; `tests/kat.rs` looks for `tests/vectors/mlkem768.json` and
+`tests/vectors/mldsa65.json` and **fails loudly** when either is absent rather
+than skipping — a silently skipped known-answer test is worse than none,
+because it reads as a pass. Each test also asserts a minimum number of vectors
+actually consumed, since a file that parses but matches nothing reads as a pass
+just as convincingly.

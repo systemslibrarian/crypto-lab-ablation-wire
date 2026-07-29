@@ -71,6 +71,13 @@ pub struct Transmission {
     pub kem: String,
     pub kem_requested: String,
     pub is_pq: bool,
+    /// The signature suite that authenticated the peer, and whether *it* is
+    /// post-quantum. A hybrid KEM under a classical signature is post-quantum
+    /// for confidentiality only, and the page says so rather than showing one
+    /// undifferentiated "PQ" badge.
+    pub sig_suite: String,
+    pub sig_is_pq: bool,
+    pub fully_pq: bool,
     pub suite: String,
     pub authenticated: bool,
     pub transcript_hash: String,
@@ -255,6 +262,9 @@ pub fn transmit(config: JsValue) -> Result<JsValue, JsValue> {
         kem: sender.hs.kem_name.to_string(),
         kem_requested: k.name().to_string(),
         is_pq: sender.hs.kem_is_pq,
+        sig_suite: sender.hs.sig_suite.name().to_string(),
+        sig_is_pq: sender.hs.sig_suite.is_pq(),
+        fully_pq: sender.hs.is_fully_pq(),
         suite: suite.name().to_string(),
         authenticated: sender.hs.authenticated,
         transcript_hash: hex::encode(sender.hs.transcript_hash),

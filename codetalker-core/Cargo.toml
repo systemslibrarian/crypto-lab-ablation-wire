@@ -13,7 +13,7 @@ default = ["classical"]
 classical = ["dep:x25519-dalek", "dep:ed25519-dalek"]
 # Hybrid X-Wing (X25519 + ML-KEM-768) via libcrux.
 # Requires a recent toolchain; see README for the pinned MSRV.
-pq = ["dep:libcrux-kem", "dep:rand_core_010"]
+pq = ["dep:libcrux-kem", "dep:libcrux-ml-dsa", "dep:rand_core_010"]
 
 [dependencies]
 hkdf = "0.12"
@@ -27,6 +27,7 @@ zeroize = "1.8"
 x25519-dalek = { version = "2.0", optional = true, features = ["static_secrets"] }
 ed25519-dalek = { version = "2.1", optional = true }
 libcrux-kem = { version = "0.0.9", optional = true }
+libcrux-ml-dsa = { version = "0.0.10", optional = true }
 # libcrux takes its RNG through rand_core 0.10's `CryptoRng`, which is a
 # different trait from the 0.6 one the rest of this crate uses. Pulled in under
 # an alias so `kem::libcrux_rng` can bridge the two rather than standing up a
