@@ -7,6 +7,20 @@ version: 2
 #
 # Dependabot rewrites the SHA *and* the trailing `# vX.Y.Z` comment together,
 # which is the property that makes the pins readable rather than opaque.
+#
+# The grouping below is not tidiness. The first version of this file grouped only
+# the root ecosystem, and the result was immediate and instructive: eight PRs, of
+# which three bumped one member each of a crate family that has to move together.
+# `chacha20poly1305` 0.11 does not build against `aes-gcm` 0.10 -- both moved to
+# `hybrid_array` in the same release -- so each of those PRs was unbuildable by
+# construction, and CI correctly failed all of them. A splintered family is not a
+# smaller change than the family; it is a change that cannot compile.
+#
+# The group lists are written out per entry rather than shared through a YAML
+# anchor. Anchors are valid YAML but not dependably supported by Dependabot's
+# own parser, and a config file that silently fails to load is the exact failure
+# mode the rest of this repository is organised against. Duplication that is
+# known to work beats elegance that might not.
 updates:
   - package-ecosystem: github-actions
     directory: "/"
@@ -15,6 +29,11 @@ updates:
     commit-message:
       prefix: "ci"
     labels: ["dependencies", "github-actions"]
+    groups:
+      # These move as a set in practice, and a workflow half-updated is a
+      # workflow nobody can reason about.
+      actions:
+        patterns: ["*"]
 
   # Three separate Cargo manifests, and none of them is reachable from the
   # others. codetalker-wasm is `exclude`d from the root workspace and fuzz/
@@ -29,9 +48,10 @@ updates:
     commit-message:
       prefix: "deps"
     labels: ["dependencies", "rust"]
+    open-pull-requests-limit: 5
     groups:
-      # RustCrypto's traits move in lockstep; separate PRs for each would not
-      # compile on their own.
+      # RustCrypto's traits move in lockstep behind `hybrid_array`; separate PRs
+      # for each do not compile on their own.
       rustcrypto:
         patterns:
           - "aes-gcm"
@@ -41,6 +61,14 @@ updates:
           - "digest"
           - "subtle"
           - "zeroize"
+          - "aead"
+          - "cipher"
+      # Both dalek crates sit on the same curve25519-dalek, so a major on one
+      # needs the other in the same commit.
+      dalek:
+        patterns:
+          - "*-dalek"
+          - "curve25519-dalek"
       libcrux:
         patterns:
           - "libcrux-*"
@@ -52,11 +80,52 @@ updates:
     commit-message:
       prefix: "deps(wasm)"
     labels: ["dependencies", "rust", "wasm"]
+    open-pull-requests-limit: 3
+    groups:
+      rustcrypto:
+        patterns:
+          - "aes-gcm"
+          - "chacha20poly1305"
+          - "hkdf"
+          - "sha2"
+          - "digest"
+          - "subtle"
+          - "zeroize"
+          - "aead"
+          - "cipher"
+      dalek:
+        patterns:
+          - "*-dalek"
+          - "curve25519-dalek"
+      libcrux:
+        patterns:
+          - "libcrux-*"
+      # wasm-bindgen, js-sys and serde-wasm-bindgen are version-coupled: the
+      # glue generated into web/pkg has to match the runtime that loads it.
+      wasm-bindgen:
+        patterns:
+          - "wasm-bindgen*"
+          - "js-sys"
+          - "serde-wasm-bindgen"
+          - "getrandom"
 
+  # Lockfile only, deliberately. `fuzz/` declares one real dependency
+  # (libfuzzer-sys) and reaches everything else through a path dependency on
+  # codetalker-core, so a manifest-editing updater here proposes edits to
+  # `codetalker-core/Cargo.toml` that the root entry has already proposed. That
+  # is what happened: two PRs per upgrade, touching the same manifest, differing
+  # only in which lockfile they refreshed -- and therefore guaranteed to conflict
+  # with each other. The lock still needs refreshing so a fuzzing run is
+  # reproducible; the manifest is the root entry's business.
   - package-ecosystem: cargo
     directory: "/fuzz"
+    versioning-strategy: lockfile-only
     schedule:
       interval: weekly
     commit-message:
       prefix: "deps(fuzz)"
     labels: ["dependencies", "rust"]
+    open-pull-requests-limit: 2
+    groups:
+      fuzz-lockfile:
+        patterns: ["*"]
