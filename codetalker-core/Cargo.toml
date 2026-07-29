@@ -32,7 +32,7 @@ check-secret-independence = [
 [dependencies]
 hkdf = "0.12"
 sha2 = "0.10"
-aes-gcm = "0.10"
+aes-gcm = "0.11"
 chacha20poly1305 = "0.10"
 rand_core = { version = "0.6", features = ["getrandom"] }
 subtle = "2.5"
