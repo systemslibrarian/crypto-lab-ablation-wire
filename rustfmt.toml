@@ -1,0 +1,8 @@
+max_width = 110
+
+# `max_width` alone does not do what it looks like it does: rustfmt gates
+# struct literals on their own width, which defaults to 18 regardless of
+# `max_width`. Without this, `Frame { wire, nonce, message_key, counter }`
+# explodes across five lines while sitting well inside 110 columns. Raised to
+# preserve the compact literal style this crate is written in.
+struct_lit_width = 80

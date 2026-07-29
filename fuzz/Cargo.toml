@@ -1,0 +1,24 @@
+[package]
+name = "codetalker-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+# Its own workspace root. Without this, cargo resolves upward, finds the
+# workspace at the repository root, and refuses to build a package that is
+# neither a member nor excluded.
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+codetalker-core = { path = "../codetalker-core" }
+
+[[bin]]
+name = "deobfuscate"
+path = "fuzz_targets/deobfuscate.rs"
+test = false
+doc = false
+bench = false

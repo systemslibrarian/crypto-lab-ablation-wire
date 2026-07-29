@@ -1,0 +1,988 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>codetalker — layer ablation console</title>
+<meta name="description" content="Switch each layer of a secure channel off and watch what an adversary recovers. Real primitives, compiled to WebAssembly." />
+<style>
+:root {
+  /* Neutrals carry a slight blue bias so they sit with the steel accent
+     rather than beside it. */
+  --ground: #f7f8fa;
+  --panel: #ffffff;
+  --panel-2: #eef1f6;
+  --line: #d8dee8;
+  --line-soft: #e7ebf2;
+  --ink: #171b22;
+  --ink-2: #454e5e;
+  --ink-3: #6d7789;
+
+  --accent: #4c7bb8;
+  --accent-ink: #2f5d96;
+  --accent-wash: #e8f0f9;
+
+  /* Semantic, and deliberately not the accent. */
+  --ok: #2f8f6f;
+  --ok-wash: #e4f2ec;
+  --bad: #c4453a;
+  --bad-wash: #fbe9e7;
+  --warn: #b8863b;
+  --warn-wash: #f9f0e0;
+
+  --hex-framing: #7a6ea8;
+  --hex-length: #4c7bb8;
+  --hex-ct: #454e5e;
+  --hex-tag: #b8863b;
+  --hex-pad: #b6bfcd;
+  --hex-pt: #c4453a;
+
+  --fs-xs: 0.75rem;
+  --fs-sm: 0.8125rem;
+  --fs-base: 0.9375rem;
+  --fs-md: 1.0625rem;
+  --fs-lg: 1.375rem;
+  --fs-xl: 1.875rem;
+
+  --serif: ui-serif, "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+  --radius: 6px;
+  --shadow: 0 1px 2px rgba(20, 28, 44, 0.06), 0 4px 12px rgba(20, 28, 44, 0.04);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --ground: #12151b;
+    --panel: #191d25;
+    --panel-2: #212734;
+    --line: #2f3745;
+    --line-soft: #262d39;
+    --ink: #e7ecf4;
+    --ink-2: #a8b3c4;
+    --ink-3: #7b8699;
+
+    --accent: #7aa5d9;
+    --accent-ink: #9dc0ea;
+    --accent-wash: #1c2735;
+
+    --ok: #4fb894;
+    --ok-wash: #16281f;
+    --bad: #e2695c;
+    --bad-wash: #2c1a19;
+    --warn: #d4a355;
+    --warn-wash: #2a2216;
+
+    --hex-framing: #a99ad8;
+    --hex-length: #7aa5d9;
+    --hex-ct: #a8b3c4;
+    --hex-tag: #d4a355;
+    --hex-pad: #4a5464;
+    --hex-pt: #e2695c;
+
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
+  }
+}
+
+/* The viewer's explicit choice must win over the OS preference in both
+   directions, so both themes are restated at the token level. */
+:root[data-theme="light"] {
+  --ground: #f7f8fa; --panel: #ffffff; --panel-2: #eef1f6;
+  --line: #d8dee8; --line-soft: #e7ebf2;
+  --ink: #171b22; --ink-2: #454e5e; --ink-3: #6d7789;
+  --accent: #4c7bb8; --accent-ink: #2f5d96; --accent-wash: #e8f0f9;
+  --ok: #2f8f6f; --ok-wash: #e4f2ec;
+  --bad: #c4453a; --bad-wash: #fbe9e7;
+  --warn: #b8863b; --warn-wash: #f9f0e0;
+  --hex-framing: #7a6ea8; --hex-length: #4c7bb8; --hex-ct: #454e5e;
+  --hex-tag: #b8863b; --hex-pad: #b6bfcd; --hex-pt: #c4453a;
+}
+:root[data-theme="dark"] {
+  --ground: #12151b; --panel: #191d25; --panel-2: #212734;
+  --line: #2f3745; --line-soft: #262d39;
+  --ink: #e7ecf4; --ink-2: #a8b3c4; --ink-3: #7b8699;
+  --accent: #7aa5d9; --accent-ink: #9dc0ea; --accent-wash: #1c2735;
+  --ok: #4fb894; --ok-wash: #16281f;
+  --bad: #e2695c; --bad-wash: #2c1a19;
+  --warn: #d4a355; --warn-wash: #2a2216;
+  --hex-framing: #a99ad8; --hex-length: #7aa5d9; --hex-ct: #a8b3c4;
+  --hex-tag: #d4a355; --hex-pad: #4a5464; --hex-pt: #e2695c;
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: var(--fs-base);
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--serif); font-weight: 600; text-wrap: balance; margin: 0; }
+
+a { color: var(--accent-ink); text-decoration-thickness: 1px; text-underline-offset: 2px; }
+
+code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+/* ---------------------------------------------------------------- masthead */
+
+.masthead {
+  border-bottom: 1px solid var(--line);
+  background: var(--panel);
+  padding: 1.5rem clamp(1rem, 3vw, 2.25rem) 1.25rem;
+}
+.masthead-inner {
+  max-width: 1500px; margin: 0 auto;
+  display: flex; flex-wrap: wrap; gap: 1.5rem;
+  align-items: flex-start; justify-content: space-between;
+}
+.masthead h1 { font-size: var(--fs-xl); letter-spacing: -0.015em; }
+.masthead .thesis {
+  margin: 0.5rem 0 0; max-width: 62ch;
+  color: var(--ink-2); font-size: var(--fs-base);
+}
+.build-badges { display: flex; flex-direction: column; gap: 0.4rem; align-items: flex-end; }
+
+.badge {
+  display: inline-flex; align-items: center; gap: 0.45rem;
+  font-family: var(--mono); font-size: var(--fs-xs);
+  padding: 0.25rem 0.55rem; border-radius: 999px;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-2);
+  white-space: nowrap;
+}
+.badge.on { border-color: var(--ok); color: var(--ok); background: var(--ok-wash); }
+.badge.off { border-color: var(--line); color: var(--ink-3); }
+
+/* ------------------------------------------------------------------ layout */
+
+.console {
+  max-width: 1500px; margin: 0 auto;
+  padding: 1.5rem clamp(1rem, 3vw, 2.25rem) 4rem;
+  display: grid; gap: 1.5rem;
+  grid-template-columns: minmax(320px, 370px) minmax(0, 1fr);
+  align-items: start;
+}
+@media (max-width: 1000px) { .console { grid-template-columns: minmax(0, 1fr); } }
+
+.rail { display: flex; flex-direction: column; gap: 1rem; position: sticky; top: 1.5rem; }
+@media (max-width: 1000px) { .rail { position: static; } }
+
+.readout { display: flex; flex-direction: column; gap: 1.25rem; min-width: 0; }
+
+.card {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+}
+.card > header {
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--line-soft);
+  display: flex; align-items: baseline; justify-content: space-between; gap: 0.75rem;
+}
+.card > header h2 { font-size: var(--fs-md); letter-spacing: -0.01em; }
+.card > header .note { font-size: var(--fs-xs); color: var(--ink-3); font-family: var(--mono); }
+.card .body { padding: 1rem; }
+
+.eyebrow {
+  font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--ink-3); font-weight: 600;
+}
+
+/* ------------------------------------------------------------------ inputs */
+
+.field { display: flex; flex-direction: column; gap: 0.3rem; }
+.field label { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2); }
+.field input[type="text"], .field select {
+  font: inherit; font-size: var(--fs-sm);
+  padding: 0.45rem 0.55rem;
+  border: 1px solid var(--line); border-radius: 4px;
+  background: var(--ground); color: var(--ink);
+  width: 100%;
+}
+.field .hint { font-size: var(--fs-xs); color: var(--ink-3); }
+
+.switch-group { display: flex; flex-direction: column; gap: 0.15rem; }
+.switch-group + .switch-group { margin-top: 0.9rem; }
+.switch-group > .eyebrow { margin-bottom: 0.35rem; }
+
+.switch {
+  display: grid; grid-template-columns: 2.2rem 1fr; gap: 0.65rem;
+  align-items: start;
+  padding: 0.5rem; margin: 0 -0.5rem;
+  border-radius: 4px; cursor: pointer;
+}
+.switch:hover { background: var(--panel-2); }
+.switch.disabled { opacity: 0.45; cursor: not-allowed; }
+.switch.disabled:hover { background: none; }
+
+.switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.track {
+  width: 2.2rem; height: 1.2rem; margin-top: 0.15rem;
+  border-radius: 999px; background: var(--line);
+  border: 1px solid var(--line);
+  position: relative; transition: background 0.12s ease, border-color 0.12s ease;
+  flex: none;
+}
+.track::after {
+  content: ""; position: absolute; top: 1px; left: 1px;
+  width: calc(1.2rem - 4px); height: calc(1.2rem - 4px);
+  border-radius: 999px; background: var(--panel);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.25);
+  transition: transform 0.12s ease;
+}
+.switch input:checked + .track { background: var(--accent); border-color: var(--accent); }
+.switch input:checked + .track::after { transform: translateX(1rem); }
+.switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* The injected-fault switch is not a security control; colour it as damage. */
+.switch.fault input:checked + .track { background: var(--bad); border-color: var(--bad); }
+
+.switch-text { min-width: 0; }
+.switch-name { font-size: var(--fs-sm); font-weight: 600; display: block; }
+.switch-sub { font-size: var(--fs-xs); color: var(--ink-3); display: block; }
+.switch-sub .mono { color: var(--ink-2); }
+.switch-why { font-size: var(--fs-xs); color: var(--warn); display: none; margin-top: 0.15rem; }
+.switch.disabled .switch-why { display: block; }
+
+/* The Kieyoomia control is the claim the whole page is built around, so it
+   gets its own frame rather than sitting in the list above. */
+.kieyoomia {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--accent);
+  border-radius: 4px;
+  background: var(--accent-wash);
+  padding: 0.65rem 0.75rem;
+}
+.kieyoomia .switch:hover { background: transparent; }
+.kieyoomia p { margin: 0.5rem 0 0; font-size: var(--fs-xs); color: var(--ink-2); }
+
+/* ----------------------------------------------------------------- verdict */
+
+.verdict { border-left: 4px solid var(--ink-3); }
+.verdict.state-ok { border-left-color: var(--ok); }
+.verdict.state-bad { border-left-color: var(--bad); }
+.verdict .body { display: flex; flex-direction: column; gap: 0.75rem; }
+.verdict-head { display: flex; align-items: baseline; gap: 0.75rem; flex-wrap: wrap; }
+.verdict-tag {
+  font-family: var(--mono); font-size: var(--fs-xs); font-weight: 600;
+  padding: 0.2rem 0.5rem; border-radius: 3px;
+  background: var(--panel-2); color: var(--ink-2); border: 1px solid var(--line);
+}
+.state-ok .verdict-tag { background: var(--ok-wash); color: var(--ok); border-color: var(--ok); }
+.state-bad .verdict-tag { background: var(--bad-wash); color: var(--bad); border-color: var(--bad); }
+.verdict-headline { font-family: var(--serif); font-size: var(--fs-lg); letter-spacing: -0.01em; }
+.verdict-detail { margin: 0; color: var(--ink-2); max-width: 68ch; }
+
+.recovered-box {
+  border: 1px solid var(--bad); background: var(--bad-wash);
+  border-radius: 4px; padding: 0.6rem 0.75rem;
+}
+.recovered-box .eyebrow { color: var(--bad); }
+.recovered-text {
+  font-family: var(--mono); font-size: var(--fs-sm);
+  margin-top: 0.3rem; word-break: break-word; white-space: pre-wrap; color: var(--ink);
+}
+
+/* -------------------------------------------------------------------- wire */
+
+.wire-meta {
+  display: flex; flex-wrap: wrap; gap: 1.25rem;
+  padding-bottom: 0.85rem; margin-bottom: 0.85rem;
+  border-bottom: 1px solid var(--line-soft);
+}
+.metric { display: flex; flex-direction: column; gap: 0.1rem; }
+.metric .k { font-size: var(--fs-xs); color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.07em; }
+.metric .v { font-family: var(--mono); font-size: var(--fs-sm); font-variant-numeric: tabular-nums; }
+
+.hexdump {
+  overflow-x: auto;
+  font-family: var(--mono); font-size: var(--fs-xs); line-height: 1.7;
+  background: var(--ground); border: 1px solid var(--line-soft);
+  border-radius: 4px; padding: 0.6rem 0.75rem;
+}
+.hexrow { display: flex; gap: 1rem; white-space: pre; }
+.hexrow .off { color: var(--ink-3); }
+.hexrow .bytes { letter-spacing: 0.02em; }
+.hexrow .ascii { color: var(--ink-3); }
+.b-framing { color: var(--hex-framing); }
+.b-length { color: var(--hex-length); }
+.b-ciphertext { color: var(--hex-ct); }
+.b-tag { color: var(--hex-tag); }
+.b-padding { color: var(--hex-pad); }
+.b-plaintext { color: var(--hex-pt); font-weight: 700; }
+.a-plaintext { color: var(--hex-pt); font-weight: 700; }
+
+.legend { display: flex; flex-wrap: wrap; gap: 0.9rem; margin-top: 0.7rem; font-size: var(--fs-xs); }
+.legend span { display: inline-flex; align-items: center; gap: 0.35rem; color: var(--ink-3); }
+.legend i { width: 0.7rem; height: 0.7rem; border-radius: 2px; background: currentColor; font-style: normal; }
+
+.frame-tabs { display: flex; gap: 0.25rem; }
+.frame-tab {
+  font: inherit; font-size: var(--fs-xs); font-family: var(--mono);
+  padding: 0.25rem 0.6rem; border-radius: 3px; cursor: pointer;
+  border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-3);
+}
+.frame-tab[aria-selected="true"] { background: var(--accent-wash); border-color: var(--accent); color: var(--accent-ink); font-weight: 600; }
+
+/* ------------------------------------------------------------------ tables */
+
+.facts { width: 100%; border-collapse: collapse; font-size: var(--fs-sm); }
+.facts th, .facts td { text-align: left; padding: 0.35rem 0; vertical-align: top; border-bottom: 1px solid var(--line-soft); }
+.facts tr:last-child th, .facts tr:last-child td { border-bottom: none; }
+.facts th { font-weight: 600; color: var(--ink-3); width: 40%; font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.06em; padding-top: 0.5rem; }
+.facts td { font-family: var(--mono); word-break: break-all; }
+
+.receiver { display: flex; align-items: flex-start; gap: 0.6rem; }
+.dot { width: 0.6rem; height: 0.6rem; border-radius: 999px; margin-top: 0.45rem; flex: none; background: var(--ink-3); }
+.dot.ok { background: var(--ok); }
+.dot.bad { background: var(--bad); }
+.receiver-text { min-width: 0; }
+.receiver-msg { font-family: var(--mono); font-size: var(--fs-sm); word-break: break-word; }
+
+/* ------------------------------------------------------------- pad recovery */
+
+.pad-cols { display: grid; gap: 0.75rem; grid-template-columns: 1fr; }
+.pad-line { border: 1px solid var(--line-soft); border-radius: 4px; padding: 0.55rem 0.7rem; background: var(--ground); }
+.pad-line .eyebrow { margin-bottom: 0.2rem; }
+.pad-val { font-family: var(--mono); font-size: var(--fs-sm); word-break: break-word; white-space: pre-wrap; }
+.pad-recovered { color: var(--bad); font-weight: 600; }
+.pad-lost { color: var(--ink-3); }
+.bound-note { font-size: var(--fs-xs); color: var(--warn); margin-top: 0.5rem; }
+
+/* ------------------------------------------------------------------ history */
+
+.history .body { font-size: var(--fs-sm); color: var(--ink-2); }
+.history p { margin: 0 0 0.7rem; max-width: 68ch; }
+.history p:last-child { margin-bottom: 0; }
+.history strong { color: var(--ink); }
+.notice {
+  border: 1px solid var(--warn); background: var(--warn-wash);
+  border-radius: 4px; padding: 0.6rem 0.75rem; margin-top: 0.85rem;
+}
+.notice .eyebrow { color: var(--warn); }
+.notice p { margin: 0.25rem 0 0; font-size: var(--fs-xs); }
+
+/* -------------------------------------------------------------------- misc */
+
+.fatal {
+  margin: 3rem auto; max-width: 640px;
+  border: 1px solid var(--warn); background: var(--warn-wash);
+  border-radius: var(--radius); padding: 1.25rem 1.5rem;
+}
+.fatal h2 { font-size: var(--fs-md); margin-bottom: 0.5rem; }
+.fatal pre {
+  overflow-x: auto; background: var(--panel); border: 1px solid var(--line);
+  border-radius: 4px; padding: 0.6rem 0.75rem; font-size: var(--fs-xs);
+  font-family: var(--mono); margin: 0.6rem 0 0;
+}
+.hidden { display: none !important; }
+/* `display: grid` on .console would otherwise beat the UA stylesheet's rule
+   for [hidden], leaving a dead console on screen when the module is missing. */
+[hidden] { display: none !important; }
+
+.foot {
+  max-width: 1500px; margin: 0 auto; padding: 0 clamp(1rem, 3vw, 2.25rem) 3rem;
+  font-size: var(--fs-xs); color: var(--ink-3); display: flex; flex-wrap: wrap; gap: 1rem;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div>
+      <h1>Layer ablation console</h1>
+      <p class="thesis">
+        The 1942 code-talker stack was three layers deep. Switch them off one at a time
+        and watch what an adversary actually recovers — the point is to find out which
+        layer was load-bearing, not to build a secure channel.
+      </p>
+    </div>
+    <div class="build-badges" id="build-badges"></div>
+  </div>
+</header>
+
+<div id="fatal" class="fatal hidden">
+  <h2>The WebAssembly module has not been built</h2>
+  <p id="fatal-detail">
+    This page drives the real <code>codetalker-core</code> crate compiled to WebAssembly.
+    Nothing on it is simulated in JavaScript, so with the module absent there is nothing
+    to show. Build it, then serve this directory over HTTP:
+  </p>
+  <pre>wasm-pack build codetalker-wasm --target web --release --out-dir ../web/pkg
+python3 -m http.server -d web 8080</pre>
+  <p style="margin-top:0.75rem;font-size:var(--fs-xs)">
+    Opening this file directly with <code>file://</code> will not work either — ES modules
+    and <code>WebAssembly.instantiateStreaming</code> both require an HTTP origin.
+  </p>
+</div>
+
+<main class="console" id="console" hidden>
+
+  <!-- ------------------------------------------------------------- control -->
+  <div class="rail">
+    <section class="card">
+      <header><h2>Transmission</h2></header>
+      <div class="body" style="display:flex;flex-direction:column;gap:0.85rem">
+        <div class="field">
+          <label for="msg1">Message 1</label>
+          <input type="text" id="msg1" value="Request immediate air support at grid 214 by 0600." />
+        </div>
+        <div class="field">
+          <label for="msg2">Message 2</label>
+          <input type="text" id="msg2" value="Enemy armour massing north of the ridge line tonight." />
+          <span class="hint">Sent on the same channel. The ratchet and the two-time pad are both claims about consecutive messages, so one is not enough to show either.</span>
+        </div>
+        <div class="field">
+          <label for="backend">Key encapsulation</label>
+          <select id="backend"></select>
+          <span class="hint" id="backend-hint"></span>
+        </div>
+        <div class="field">
+          <label for="suite">AEAD suite</label>
+          <select id="suite">
+            <option value="aes">AES-256-GCM</option>
+            <option value="chacha">ChaCha20-Poly1305</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><h2>Layers</h2><span class="note" id="layer-count"></span></header>
+      <div class="body">
+        <div class="switch-group" id="group-1942">
+          <div class="eyebrow">The 1942 stack</div>
+        </div>
+        <div class="switch-group" id="group-absent">
+          <div class="eyebrow">Absent in 1942</div>
+        </div>
+        <div class="switch-group" id="group-fault">
+          <div class="eyebrow">Injected fault</div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><h2>The adversary</h2></header>
+      <div class="body">
+        <div class="kieyoomia" id="kieyoomia-box"></div>
+      </div>
+    </section>
+  </div>
+
+  <!-- ------------------------------------------------------------- readout -->
+  <div class="readout">
+
+    <section class="card verdict" id="verdict">
+      <header>
+        <h2>What the adversary recovers</h2>
+        <span class="note" id="verdict-note"></span>
+      </header>
+      <div class="body">
+        <div class="verdict-head">
+          <span class="verdict-tag" id="verdict-tag">—</span>
+          <span class="verdict-headline" id="verdict-headline">—</span>
+        </div>
+        <p class="verdict-detail" id="verdict-detail"></p>
+        <div class="recovered-box hidden" id="recovered-box">
+          <div class="eyebrow">Plaintext in the adversary's hands</div>
+          <div class="recovered-text" id="recovered-text"></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card hidden" id="pad-card">
+      <header>
+        <h2>Two-time pad</h2>
+        <span class="note">computed on the real ciphertext</span>
+      </header>
+      <div class="body">
+        <p class="verdict-detail" style="margin-bottom:0.85rem">
+          Both frames were sealed under one key and one nonce, so
+          <span class="mono">C₁ ⊕ C₂ = P₁ ⊕ P₂</span>. Taking message 1 as a known crib
+          cancels the keystream and leaves message 2.
+        </p>
+        <div class="pad-cols">
+          <div class="pad-line">
+            <div class="eyebrow">Crib — message 1, assumed known</div>
+            <div class="pad-val" id="pad-crib"></div>
+          </div>
+          <div class="pad-line">
+            <div class="eyebrow">Recovered — message 2, never transmitted in clear</div>
+            <div class="pad-val" id="pad-out"></div>
+          </div>
+        </div>
+        <div class="bound-note" id="pad-bound"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header>
+        <h2>On the wire</h2>
+        <div class="frame-tabs" role="tablist" aria-label="Frame">
+          <button class="frame-tab" role="tab" data-frame="0" aria-selected="true">frame 1</button>
+          <button class="frame-tab" role="tab" data-frame="1" aria-selected="false">frame 2</button>
+        </div>
+      </header>
+      <div class="body">
+        <div class="wire-meta" id="wire-meta"></div>
+        <div class="hexdump" id="hexdump"></div>
+        <div class="legend" id="legend"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><h2>The intended recipient</h2><span class="note" id="recv-note"></span></header>
+      <div class="body">
+        <div class="receiver">
+          <span class="dot" id="recv-dot"></span>
+          <div class="receiver-text">
+            <div class="receiver-msg" id="recv-msg"></div>
+            <div class="hint" id="recv-hint" style="font-size:var(--fs-xs);color:var(--ink-3)"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="card">
+      <header><h2>Handshake</h2></header>
+      <div class="body">
+        <table class="facts"><tbody id="facts"></tbody></table>
+      </div>
+    </section>
+
+    <section class="card history">
+      <header><h2>Why this stack, and whose it was</h2></header>
+      <div class="body">
+        <p>
+          The Navajo code was a <strong>Type One Code</strong>: Navajo words stood for English
+          letters homophonically — A could be sent as the word for ant, apple or axe — layered
+          over a codebook of several hundred military terms. It was not "speaking Navajo."
+        </p>
+        <p>
+          <strong>Joe Kieyoomia</strong>, a Navajo speaker held as a prisoner of war, was forced
+          to listen to intercepted transmissions. He recognised his own language and could not
+          read a word of it, because he did not have the codebook. He was tortured in the course
+          of it. Popular retellings credit the rarity of the language; the record credits the
+          codebook. That is the switch in the left rail, and it is the one that changes nothing.
+        </p>
+        <p>
+          By modern standards the scheme is a homophonic substitution over a rare language.
+          Contemporary analyses hold that a team pairing a native speaker with trained
+          cryptanalysts would likely have broken it. The Japanese had the speaker and never
+          assembled the team — an operational failure on their side, not cryptographic strength
+          on the Allied side.
+        </p>
+        <div class="notice">
+          <div class="eyebrow">Before this goes anywhere public</div>
+          <p>
+            This material belongs to the Navajo Nation. The Navajo Code Talkers Museum and the
+            Navajo Nation Museum should be contacted and the framing reviewed by them first —
+            their involvement would be worth more than any technical feature in this repository.
+          </p>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer class="foot">
+  <span>Every value on this page is computed by <code>codetalker-core</code> compiled to WebAssembly. The page renders; it decides nothing.</span>
+  <span><a href="../README.md">README</a> · <a href="../THREAT_MODEL.md">Threat model</a> · <a href="../SOURCES.md">Sources</a></span>
+</footer>
+
+<script type="module">
+const LAYERS = [
+  { key: "keyAgreement", group: "group-1942", name: "Key agreement",
+    sub: "1942: the pre-shared codebook", impl: "kem + kdf + handshake" },
+  { key: "aead", group: "group-1942", name: "Authenticated encryption",
+    sub: "1942: homophonic substitution", impl: "aead" },
+  { key: "transport", group: "group-1942", name: "Transport obfuscation",
+    sub: "1942: a rare unwritten language", impl: "transport" },
+  { key: "authenticate", group: "group-absent", name: "Peer authentication",
+    sub: "Ed25519 over the transcript, pinned", impl: "identity" },
+  { key: "ratchet", group: "group-absent", name: "Symmetric ratchet",
+    sub: "A fresh key per message", impl: "ratchet" },
+  { key: "nonceReuse", group: "group-fault", name: "Repeat the nonce",
+    sub: "Every frame sealed under nonce 07…07", impl: "fault", fault: true },
+];
+
+const state = {
+  keyAgreement: true, aead: true, transport: true,
+  authenticate: true, ratchet: true, nonceReuse: false,
+  adversaryKnowsTransport: false,
+};
+
+let wasm = null;
+let last = null;
+let activeFrame = 0;
+
+const $ = (id) => document.getElementById(id);
+
+/* -------------------------------------------------------------- boot */
+
+async function boot() {
+  try {
+    wasm = await import("./pkg/codetalker_wasm.js");
+    await wasm.default();
+  } catch (err) {
+    $("fatal").classList.remove("hidden");
+    $("fatal-detail").textContent =
+      "This page drives the real codetalker-core crate compiled to WebAssembly. " +
+      "Nothing on it is simulated in JavaScript, so with the module absent there is " +
+      "nothing to show. Loading failed with: " + err + " — build it, then serve this " +
+      "directory over HTTP:";
+    return;
+  }
+  $("console").hidden = false;
+  buildBadges();
+  buildControls();
+  run();
+}
+
+/* The UI reads the module's capabilities rather than assuming them, so a
+   feature that was not compiled in shows as absent instead of faked. */
+function buildBadges() {
+  const available = wasm.backends();
+  const wrap = $("build-badges");
+  const pq = available.includes("xwing");
+  wrap.innerHTML = "";
+
+  const pqBadge = document.createElement("span");
+  pqBadge.className = "badge " + (pq ? "on" : "off");
+  pqBadge.textContent = pq ? "post-quantum: X-Wing compiled in" : "post-quantum: not compiled in";
+  wrap.appendChild(pqBadge);
+
+  const blockBadge = document.createElement("span");
+  blockBadge.className = "badge";
+  blockBadge.textContent = `padding block: ${wasm.pad_block()} bytes`;
+  wrap.appendChild(blockBadge);
+
+  const sel = $("backend");
+  const labels = {
+    static: "static — a captured codebook",
+    x25519: "DHKEM(X25519) — pre-PQ baseline",
+    xwing: "X-Wing — X25519 + ML-KEM-768",
+  };
+  for (const name of available) {
+    const opt = document.createElement("option");
+    opt.value = name;
+    opt.textContent = labels[name] ?? name;
+    sel.appendChild(opt);
+  }
+  sel.value = available.includes("xwing") ? "xwing" : "x25519";
+}
+
+/* ---------------------------------------------------------- controls */
+
+function switchEl({ key, name, sub, impl, fault }) {
+  const label = document.createElement("label");
+  label.className = "switch" + (fault ? " fault" : "");
+  label.dataset.key = key;
+  label.innerHTML = `
+    <input type="checkbox" ${state[key] ? "checked" : ""} />
+    <span class="track"></span>
+    <span class="switch-text">
+      <span class="switch-name"></span>
+      <span class="switch-sub"></span>
+      <span class="switch-why"></span>
+    </span>`;
+  label.querySelector(".switch-name").textContent = name;
+  label.querySelector(".switch-sub").innerHTML =
+    `${sub} · <span class="mono">${impl}</span>`;
+  label.querySelector("input").addEventListener("change", (e) => {
+    state[key] = e.target.checked;
+    run();
+  });
+  return label;
+}
+
+function buildControls() {
+  for (const layer of LAYERS) $(layer.group).appendChild(switchEl(layer));
+
+  const box = $("kieyoomia-box");
+  box.appendChild(switchEl({
+    key: "adversaryKnowsTransport",
+    name: "The adversary has a fluent speaker",
+    sub: "They can strip the transport layer",
+    impl: "the Kieyoomia switch",
+  }));
+  const p = document.createElement("p");
+  p.textContent =
+    "Joe Kieyoomia could read the language and not the traffic. With the layers " +
+    "beneath engaged, this switch should change nothing — that is the claim, and it " +
+    "is checkable from here.";
+  box.appendChild(p);
+
+  for (const el of document.querySelectorAll(".frame-tab")) {
+    el.addEventListener("click", () => {
+      activeFrame = Number(el.dataset.frame);
+      for (const t of document.querySelectorAll(".frame-tab")) {
+        t.setAttribute("aria-selected", String(Number(t.dataset.frame) === activeFrame));
+      }
+      if (last) renderWire(last);
+    });
+  }
+
+  $("backend").addEventListener("change", run);
+  $("suite").addEventListener("change", run);
+  let timer;
+  for (const id of ["msg1", "msg2"]) {
+    $(id).addEventListener("input", () => {
+      clearTimeout(timer);
+      timer = setTimeout(run, 180);
+    });
+  }
+}
+
+/* A switch that cannot do anything should say so rather than sit there
+   looking operative. */
+function syncDependencies() {
+  const rules = {
+    nonceReuse: state.aead ? null : "needs authenticated encryption engaged",
+    adversaryKnowsTransport: state.transport ? null : "no transport layer left to strip",
+  };
+  for (const [key, why] of Object.entries(rules)) {
+    const label = document.querySelector(`.switch[data-key="${key}"]`);
+    if (!label) continue;
+    label.classList.toggle("disabled", why !== null);
+    label.querySelector("input").disabled = why !== null;
+    label.querySelector(".switch-why").textContent = why ?? "";
+  }
+  const on = LAYERS.filter((l) => !l.fault && state[l.key]).length;
+  $("layer-count").textContent = `${on}/5 engaged`;
+}
+
+/* --------------------------------------------------------------- run */
+
+function run() {
+  syncDependencies();
+  const cfg = {
+    plaintext: $("msg1").value,
+    secondMessage: $("msg2").value,
+    backend: $("backend").value,
+    suite: $("suite").value,
+    keyAgreement: state.keyAgreement,
+    aead: state.aead,
+    transport: state.transport,
+    authenticate: state.authenticate,
+    ratchet: state.ratchet,
+    nonceReuse: state.aead && state.nonceReuse,
+    adversaryKnowsTransport: state.transport && state.adversaryKnowsTransport,
+  };
+
+  let result;
+  try {
+    result = wasm.transmit(cfg);
+  } catch (err) {
+    $("verdict-tag").textContent = "error";
+    $("verdict-headline").textContent = "The channel refused to run.";
+    $("verdict-detail").textContent = String(err);
+    return;
+  }
+  last = result;
+  renderVerdict(result);
+  renderPad(result, cfg);
+  renderWire(result);
+  renderReceiver(result);
+  renderFacts(result, cfg);
+}
+
+/* ----------------------------------------------------------- renders */
+
+function renderVerdict(r) {
+  const card = $("verdict");
+  card.classList.toggle("state-bad", r.broken);
+  card.classList.toggle("state-ok", !r.broken);
+  $("verdict-tag").textContent = r.verdict;
+  $("verdict-headline").textContent = r.headline;
+  $("verdict-detail").textContent = r.detail;
+  $("verdict-note").textContent = r.broken ? "channel broken" : "channel holding";
+
+  const box = $("recovered-box");
+  if (r.recovered !== null && r.recovered !== undefined) {
+    box.classList.remove("hidden");
+    $("recovered-text").textContent = r.recovered;
+  } else {
+    box.classList.add("hidden");
+  }
+}
+
+function renderPad(r, cfg) {
+  const card = $("pad-card");
+  if (r.verdict !== "KeystreamReuse") { card.classList.add("hidden"); return; }
+  card.classList.remove("hidden");
+
+  const pad = wasm.two_time_pad(r.frames[0].ciphertext, r.frames[1].ciphertext, cfg.plaintext);
+  $("pad-crib").textContent = cfg.plaintext;
+
+  // Recovery reaches exactly as far as the crib and no further. Showing the
+  // truncation is the honest presentation; padding it out would not be.
+  const out = $("pad-out");
+  out.innerHTML = "";
+  const got = document.createElement("span");
+  got.className = "pad-recovered";
+  got.textContent = pad.recovered;
+  out.appendChild(got);
+  if (!pad.complete) {
+    const lost = document.createElement("span");
+    lost.className = "pad-lost";
+    lost.textContent = "█".repeat(Math.max(0, pad.targetLen - pad.boundedAt));
+    out.appendChild(lost);
+  }
+  $("pad-bound").textContent = pad.complete
+    ? `Recovered all ${pad.boundedAt} bytes: the crib was at least as long as the target.`
+    : `Recovery stops at ${pad.boundedAt} of ${pad.targetLen} bytes — the crib ran out. `
+      + `The blocks are what the attack does not reach.`;
+}
+
+const KIND_LABELS = {
+  framing: "framing", length: "length prefix", ciphertext: "ciphertext",
+  tag: "auth tag", padding: "padding", plaintext: "plaintext, in the clear",
+};
+
+function renderWire(r) {
+  const frame = r.frames[activeFrame];
+
+  const overhead = frame.wireLen - r.plaintextLen;
+  $("wire-meta").innerHTML = "";
+  const metrics = [
+    ["wire", `${frame.wireLen} bytes`],
+    ["message", `${r.plaintextLen} bytes`],
+    ["overhead", `+${overhead}`],
+    ["counter", String(frame.counter)],
+    ["nonce", frame.nonce],
+  ];
+  for (const [k, v] of metrics) {
+    const el = document.createElement("div");
+    el.className = "metric";
+    el.innerHTML = `<span class="k"></span><span class="v"></span>`;
+    el.querySelector(".k").textContent = k;
+    el.querySelector(".v").textContent = v;
+    $("wire-meta").appendChild(el);
+  }
+
+  // Flatten the labelled runs into a byte stream so the dump can be coloured
+  // per byte without JavaScript re-deriving the frame format.
+  const bytes = [];
+  for (const seg of frame.segments) {
+    for (let i = 0; i < seg.hex.length; i += 2) {
+      bytes.push({ hex: seg.hex.slice(i, i + 2), kind: seg.kind });
+    }
+  }
+
+  const dump = $("hexdump");
+  dump.innerHTML = "";
+  for (let off = 0; off < bytes.length; off += 16) {
+    const row = bytes.slice(off, off + 16);
+    const line = document.createElement("div");
+    line.className = "hexrow";
+
+    const offset = document.createElement("span");
+    offset.className = "off";
+    offset.textContent = off.toString(16).padStart(4, "0");
+    line.appendChild(offset);
+
+    const hexCol = document.createElement("span");
+    hexCol.className = "bytes";
+    row.forEach((b, i) => {
+      const s = document.createElement("span");
+      s.className = "b-" + b.kind;
+      s.textContent = b.hex + (i === 7 ? "  " : " ");
+      hexCol.appendChild(s);
+    });
+    if (row.length < 16) {
+      const filler = document.createElement("span");
+      filler.textContent = " ".repeat((16 - row.length) * 3 + (row.length <= 8 ? 1 : 0));
+      hexCol.appendChild(filler);
+    }
+    line.appendChild(hexCol);
+
+    const ascii = document.createElement("span");
+    ascii.className = "ascii";
+    row.forEach((b) => {
+      const v = parseInt(b.hex, 16);
+      const s = document.createElement("span");
+      if (b.kind === "plaintext") s.className = "a-plaintext";
+      s.textContent = v >= 0x20 && v < 0x7f ? String.fromCharCode(v) : "·";
+      ascii.appendChild(s);
+    });
+    line.appendChild(ascii);
+    dump.appendChild(line);
+  }
+
+  const kinds = [...new Set(frame.segments.map((s) => s.kind))];
+  $("legend").innerHTML = "";
+  for (const kind of kinds) {
+    const s = document.createElement("span");
+    s.innerHTML = `<i class="b-${kind}"></i>`;
+    s.appendChild(document.createTextNode(KIND_LABELS[kind] ?? kind));
+    $("legend").appendChild(s);
+  }
+}
+
+function renderReceiver(r) {
+  const dot = $("recv-dot");
+  dot.className = "dot " + (r.roundtripOk ? "ok" : "bad");
+  $("recv-msg").textContent = r.roundtrip ?? "— nothing recovered —";
+  $("recv-note").textContent = r.roundtripOk ? "message delivered" : "delivery failed";
+  $("recv-hint").textContent = r.authenticated
+    ? "Decrypted by the pinned peer, through the ordinary receive path."
+    : "With authentication off, the party that decrypted this is the attacker. "
+      + "Delivery succeeding is not evidence that it reached the intended peer.";
+}
+
+function renderFacts(r, cfg) {
+  const substituted = r.kem !== r.kemRequested;
+  const rows = [
+    ["KEM in force", r.kem + (r.isPq ? "  · post-quantum" : "")],
+    substituted ? ["KEM requested", r.kemRequested + "  · overridden, no agreement to make"] : null,
+    ["AEAD suite", r.suite],
+    ["Peer authenticated", r.authenticated ? "yes, pinned identity" : "no — any signer accepted"],
+    ["Transcript hash", r.transcriptHash],
+    ["Session root key", r.rootKey],
+    ["Frame 1 message key", r.frames[0].messageKey],
+    ["Frame 2 message key", r.frames[1].messageKey
+      + (r.frames[0].messageKey === r.frames[1].messageKey ? "  · identical, no ratchet" : "")],
+  ].filter(Boolean);
+
+  const body = $("facts");
+  body.innerHTML = "";
+  for (const [k, v] of rows) {
+    const tr = document.createElement("tr");
+    const th = document.createElement("th");
+    th.textContent = k;
+    const td = document.createElement("td");
+    td.textContent = v;
+    tr.append(th, td);
+    body.appendChild(tr);
+  }
+
+  $("backend-hint").textContent = substituted
+    ? "Ignored: with key agreement off the channel is rebuilt on a fixed secret."
+    : "";
+}
+
+boot();
+</script>
+</body>
+</html>

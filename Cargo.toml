@@ -1,0 +1,12 @@
+[workspace]
+resolver = "2"
+members = ["codetalker-core"]
+# codetalker-wasm is excluded from the default workspace build because it
+# only compiles for wasm32-unknown-unknown. Build it with:
+#   wasm-pack build codetalker-wasm --target web
+exclude = ["codetalker-wasm"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"

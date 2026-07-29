@@ -1,0 +1,39 @@
+[package]
+name = "codetalker-core"
+description = "Layer-ablation secure channel: the 1942 code-talker stack, rebuilt on modern primitives."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+# The `pq` feature pulls libcrux, which uses edition 2024.
+rust-version = "1.85"
+
+[features]
+# Classical-only KEM. Compiles everywhere, including older toolchains.
+default = ["classical"]
+classical = ["dep:x25519-dalek", "dep:ed25519-dalek"]
+# Hybrid X-Wing (X25519 + ML-KEM-768) via libcrux.
+# Requires a recent toolchain; see README for the pinned MSRV.
+pq = ["dep:libcrux-kem", "dep:rand_core_010"]
+
+[dependencies]
+hkdf = "0.12"
+sha2 = "0.10"
+aes-gcm = "0.10"
+chacha20poly1305 = "0.10"
+rand_core = { version = "0.6", features = ["getrandom"] }
+subtle = "2.5"
+zeroize = "1.8"
+
+x25519-dalek = { version = "2.0", optional = true, features = ["static_secrets"] }
+ed25519-dalek = { version = "2.1", optional = true }
+libcrux-kem = { version = "0.0.9", optional = true }
+# libcrux takes its RNG through rand_core 0.10's `CryptoRng`, which is a
+# different trait from the 0.6 one the rest of this crate uses. Pulled in under
+# an alias so `kem::libcrux_rng` can bridge the two rather than standing up a
+# second entropy source. See that module for why the bridge is safe.
+rand_core_010 = { package = "rand_core", version = "0.10", optional = true }
+
+[dev-dependencies]
+hex = "0.4"
+proptest = "1"
+serde_json = "1"

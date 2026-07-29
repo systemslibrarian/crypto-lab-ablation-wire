@@ -1,0 +1,434 @@
+//! The teaching assertions.
+//!
+//! Each test encodes a claim the demo makes in prose. If a claim stops being
+//! true, CI says so before a reader does.
+
+use codetalker_core::identity::Identity;
+use codetalker_core::kem::{self, Kem};
+use codetalker_core::session::{self, two_time_pad, Layers, Recovery};
+use codetalker_core::{aead, handshake, ratchet, transport};
+
+fn k() -> Box<dyn Kem> {
+    kem::backend("x25519").expect("classical is on by default")
+}
+const SUITE: aead::Suite = aead::Suite::Aes256Gcm;
+
+// ---------------------------------------------------------------------------
+// The handshake is real: two parties, two messages, no shortcut.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn handshake_is_two_party_and_both_sides_agree() {
+    let kem = k();
+    let responder = handshake::Responder::new(&*kem, Identity::generate()).unwrap();
+    let hello = responder.hello();
+    let pinned = responder.identity_public();
+
+    let (init, reply) = handshake::initiate(&*kem, &hello, true, Some(&pinned)).unwrap();
+    let resp = responder.accept(&reply, true).unwrap();
+
+    assert_eq!(init.root, resp.root, "both sides must derive the same root");
+    assert_eq!(init.transcript_hash, resp.transcript_hash);
+    assert!(init.authenticated && resp.authenticated);
+}
+
+#[test]
+fn distinct_sessions_produce_distinct_transcripts() {
+    let kem = k();
+    let (a, _) = session::establish(&*kem, Layers::default(), SUITE).unwrap();
+    let (b, _) = session::establish(&*kem, Layers::default(), SUITE).unwrap();
+    assert_ne!(a.hs.transcript_hash, b.hs.transcript_hash);
+    assert_ne!(a.hs.root, b.hs.root, "forward secrecy across sessions");
+}
+
+#[test]
+fn message_survives_the_full_stack_end_to_end() {
+    let kem = k();
+    let layers = Layers::default();
+    let (mut init, mut resp) = session::establish(&*kem, layers, SUITE).unwrap();
+
+    let msg = b"Request immediate air support at grid 214 by 0600.";
+    let frame = init.send(layers, msg).unwrap();
+    assert_eq!(resp.recv(layers, &frame).unwrap(), msg);
+}
+
+// ---------------------------------------------------------------------------
+// Authentication. The layer 1942 did not have.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn active_mitm_is_rejected_when_the_peer_is_pinned() {
+    let kem = k();
+    let real = handshake::Responder::new(&*kem, Identity::generate()).unwrap();
+    let attacker = handshake::Responder::new(&*kem, Identity::generate()).unwrap();
+
+    let pinned = real.identity_public();
+    // The attacker's hello carries a perfectly valid signature — under the
+    // wrong identity. Signature validity alone is not peer identity.
+    let r = handshake::initiate(&*kem, &attacker.hello(), true, Some(&pinned));
+    assert!(r.is_err(), "pinned handshake must reject the attacker");
+}
+
+#[test]
+fn active_mitm_succeeds_when_authentication_is_off() {
+    let kem = k();
+    let attacker = handshake::Responder::new(&*kem, Identity::generate()).unwrap();
+
+    let (victim, reply) = handshake::initiate(&*kem, &attacker.hello(), false, None).unwrap();
+    let attacker_hs = attacker.accept(&reply, false).unwrap();
+
+    // The victim believes it has a channel. It does — with the attacker.
+    assert_eq!(victim.root, attacker_hs.root);
+    assert!(!victim.authenticated);
+}
+
+#[test]
+fn tampered_signature_is_rejected() {
+    let kem = k();
+    let responder = handshake::Responder::new(&*kem, Identity::generate()).unwrap();
+    let mut hello = responder.hello();
+    let pinned = responder.identity_public();
+    hello.signature[0] ^= 0x01;
+
+    assert!(handshake::initiate(&*kem, &hello, true, Some(&pinned)).is_err());
+}
+
+#[test]
+fn tampered_kem_key_breaks_the_signed_transcript() {
+    let kem = k();
+    let responder = handshake::Responder::new(&*kem, Identity::generate()).unwrap();
+    let mut hello = responder.hello();
+    let pinned = responder.identity_public();
+    hello.kem_pk.0[0] ^= 0x01;
+
+    // The signature covers the transcript, so swapping the key invalidates it.
+    assert!(handshake::initiate(&*kem, &hello, true, Some(&pinned)).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// The Kieyoomia case, and the layers people mistake for security.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn kieyoomia_linguist_without_codebook_recovers_nothing() {
+    let kem = k();
+    let layers = Layers::default();
+    let (mut init, _) = session::establish(&*kem, layers, SUITE).unwrap();
+    let frame = init.send(layers, b"secret").unwrap();
+
+    // Knowing the transport is exactly the thing that does not help.
+    assert_eq!(
+        session::adversary(&init, &frame, layers, true).unwrap(),
+        Recovery::MetadataOnly
+    );
+    assert_eq!(
+        session::adversary(&init, &frame, layers, false).unwrap(),
+        Recovery::MetadataOnly
+    );
+}
+
+#[test]
+fn obscurity_only_is_fully_broken() {
+    let kem = k();
+    let layers = Layers { key_agreement: false, aead: false, ..Layers::default() };
+    let (mut init, _) = session::establish(&*kem, layers, SUITE).unwrap();
+
+    let msg = b"Request immediate air support";
+    let frame = init.send(layers, msg).unwrap();
+    assert_ne!(&frame.wire[..], &msg[..], "the wire is not the plaintext");
+
+    match session::adversary(&init, &frame, layers, true).unwrap() {
+        Recovery::Plaintext(p) => assert_eq!(&p, msg),
+        other => panic!("expected full recovery, got {other:?}"),
+    }
+}
+
+#[test]
+fn captured_codebook_opens_everything() {
+    let kem = kem::backend("static").unwrap();
+    let layers = Layers { key_agreement: false, ..Layers::default() };
+    let (mut init, _) = session::establish(&*kem, layers, SUITE).unwrap();
+
+    let msg = b"every message ever sent under this key";
+    let frame = init.send(layers, msg).unwrap();
+    match session::adversary(&init, &frame, layers, true).unwrap() {
+        Recovery::Plaintext(p) => assert_eq!(&p, msg),
+        other => panic!("expected full recovery, got {other:?}"),
+    }
+}
+
+#[test]
+fn nonce_reuse_leaks_plaintext_via_xor() {
+    let key = [0x99u8; 32];
+    let nonce = [7u8; 12];
+
+    let p1 = b"Request immediate air support at grid 214 by 0600.";
+    let p2 = b"Enemy armour massing north of the ridge line tonight.";
+
+    let c1 = aead::seal(SUITE, &key, &nonce, b"", p1).unwrap();
+    let c2 = aead::seal(SUITE, &key, &nonce, b"", p2).unwrap();
+
+    let recovered = two_time_pad(
+        &c1[..c1.len() - aead::TAG_LEN],
+        &c2[..c2.len() - aead::TAG_LEN],
+        p1,
+    );
+
+    // Recovery reaches exactly as far as the crib. That bound is the honest
+    // limit of this attack and the test asserts it rather than hiding it.
+    let n = recovered.len();
+    assert_eq!(n, p1.len().min(p2.len()));
+    assert_eq!(&recovered[..], &p2[..n]);
+}
+
+// ---------------------------------------------------------------------------
+// Ratchet. Forward secrecy, and what its absence costs.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn ratchet_derives_a_fresh_key_per_message() {
+    let mut chain = ratchet::Chain::new([0x55; 32]);
+    let k1 = chain.next().unwrap();
+    let k2 = chain.next().unwrap();
+    let k3 = chain.next().unwrap();
+
+    assert_ne!(k1, k2);
+    assert_ne!(k2, k3);
+    assert_eq!(chain.n, 3);
+
+    // The chain is the only state: replaying from the same root reproduces it.
+    let mut replay = ratchet::Chain::new([0x55; 32]);
+    assert_eq!(replay.next().unwrap(), k1);
+}
+
+#[test]
+fn without_a_ratchet_one_key_covers_every_message() {
+    let chain = ratchet::Chain::new([0x77; 32]);
+    assert_eq!(chain.static_key().unwrap(), chain.static_key().unwrap());
+    assert_eq!(chain.n, 0, "static keying never advances");
+}
+
+#[test]
+fn ratcheted_frames_use_different_keys_unratcheted_frames_do_not() {
+    let kem = k();
+
+    let on = Layers::default();
+    let (mut a, _) = session::establish(&*kem, on, SUITE).unwrap();
+    let f1 = a.send(on, b"one").unwrap();
+    let f2 = a.send(on, b"two").unwrap();
+    assert_ne!(f1.message_key, f2.message_key);
+
+    let off = Layers { ratchet: false, ..Layers::default() };
+    let (mut b, _) = session::establish(&*kem, off, SUITE).unwrap();
+    let g1 = b.send(off, b"one").unwrap();
+    let g2 = b.send(off, b"two").unwrap();
+    assert_eq!(g1.message_key, g2.message_key);
+}
+
+// ---------------------------------------------------------------------------
+// Transcript binding.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn transcript_binding_rejects_cross_session_frames() {
+    let kem = k();
+    let layers = Layers::default();
+    let (mut a, _) = session::establish(&*kem, layers, SUITE).unwrap();
+    let (b, _) = session::establish(&*kem, layers, SUITE).unwrap();
+
+    let frame = a.send(layers, b"grid 214").unwrap();
+    let body = transport::deobfuscate(&frame.wire).unwrap();
+
+    // Correct key, correct nonce, wrong session. The AAD binding rejects it.
+    assert!(aead::open(
+        SUITE,
+        &frame.message_key,
+        &frame.nonce,
+        &b.hs.transcript_hash,
+        &body
+    )
+    .is_err());
+    // Sanity: with the right transcript it opens.
+    assert!(aead::open(
+        SUITE,
+        &frame.message_key,
+        &frame.nonce,
+        &a.hs.transcript_hash,
+        &body
+    )
+    .is_ok());
+}
+
+// ---------------------------------------------------------------------------
+// Transport is not a security boundary, and its parser handles hostile input.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn transport_roundtrips_and_rejects_garbage() {
+    let data = b"ciphertext bytes here";
+    let wire = transport::obfuscate(data, 64);
+    assert!(wire.len() > data.len());
+    assert_eq!(transport::deobfuscate(&wire).unwrap(), data);
+
+    assert!(transport::deobfuscate(b"not a frame").is_err());
+    assert!(transport::deobfuscate(&[]).is_err());
+    assert!(transport::deobfuscate(&[0xAA, 0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF]).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Nonce reuse, through the real channel rather than a hand-built key.
+//
+// `nonce_reuse_leaks_plaintext_via_xor` above seals twice under a hardcoded
+// key, which is the right way to demonstrate the arithmetic and the wrong way
+// to test the harness: it cannot see whether the channel repeats the key. These
+// two do, and the answer differs depending on the ratchet.
+// ---------------------------------------------------------------------------
+
+/// Ciphertext minus its tag — the part a two-time pad operates on.
+fn ct_of(frame: &session::Frame) -> Vec<u8> {
+    let body = transport::deobfuscate(&frame.wire).unwrap();
+    body[..body.len() - aead::TAG_LEN].to_vec()
+}
+
+const P1: &[u8] = b"Request immediate air support at grid 214 by 0600.";
+const P2: &[u8] = b"Enemy armour massing north of the ridge line tonight.";
+
+#[test]
+fn nonce_reuse_without_a_ratchet_is_a_genuine_two_time_pad() {
+    let kem = k();
+    let layers = Layers { nonce_reuse: true, ratchet: false, ..Layers::default() };
+    let (mut a, _) = session::establish(&*kem, layers, SUITE).unwrap();
+
+    let f1 = a.send(layers, P1).unwrap();
+    let f2 = a.send(layers, P2).unwrap();
+    assert_eq!(f1.nonce, f2.nonce, "the nonce repeats");
+    assert_eq!(f1.message_key, f2.message_key, "and so does the key");
+
+    let recovered = two_time_pad(&ct_of(&f1), &ct_of(&f2), P1);
+    let n = recovered.len();
+    assert_eq!(&recovered[..], &P2[..n], "a crib for P1 yields P2");
+
+    assert!(matches!(
+        session::adversary(&a, &f1, layers, true).unwrap(),
+        Recovery::KeystreamReuse(_)
+    ));
+}
+
+#[test]
+fn nonce_reuse_with_a_ratchet_yields_no_pad_at_all() {
+    let kem = k();
+    let layers = Layers { nonce_reuse: true, ..Layers::default() };
+    let (mut a, _) = session::establish(&*kem, layers, SUITE).unwrap();
+
+    let f1 = a.send(layers, P1).unwrap();
+    let f2 = a.send(layers, P2).unwrap();
+    assert_eq!(f1.nonce, f2.nonce, "the nonce still repeats");
+    assert_ne!(f1.message_key, f2.message_key, "but the key does not");
+
+    // Two keystreams that were never the same do not cancel. The XOR runs and
+    // returns noise, which is exactly why the harness must not call this a
+    // break: reporting KeystreamReuse here would promise a recovery that the
+    // arithmetic cannot deliver.
+    let noise = two_time_pad(&ct_of(&f1), &ct_of(&f2), P1);
+    assert_ne!(&noise[..], &P2[..noise.len()]);
+
+    assert_eq!(
+        session::adversary(&a, &f1, layers, true).unwrap(),
+        Recovery::MetadataOnly,
+        "a repeated nonce under a ratchet is survivable"
+    );
+}
+
+// ---------------------------------------------------------------------------
+// The adversary derives its keys; it is never handed them.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn key_agreement_off_names_the_kem_the_channel_actually_used() {
+    let kem = k();
+    assert_eq!(kem.name(), "DHKEM(X25519)");
+
+    // Switching key agreement off does not mean "run X25519 and pretend": the
+    // channel is rebuilt on a fixed secret, and says so.
+    let off = Layers { key_agreement: false, ..Layers::default() };
+    let (a, _) = session::establish(&*kem, off, SUITE).unwrap();
+    assert_eq!(a.hs.kem_name, "static (captured codebook)");
+
+    let (b, _) = session::establish(&*kem, Layers::default(), SUITE).unwrap();
+    assert_eq!(b.hs.kem_name, "DHKEM(X25519)");
+}
+
+#[test]
+fn captured_codebook_recovery_survives_the_ratchet() {
+    // The adversary rebuilds the chain from the fixed secret and walks it to the
+    // frame's counter, so recovery holds at message N, not just message one.
+    let kem = k();
+    let layers = Layers { key_agreement: false, ..Layers::default() };
+    let (mut a, _) = session::establish(&*kem, layers, SUITE).unwrap();
+
+    let _ = a.send(layers, b"first").unwrap();
+    let _ = a.send(layers, b"second").unwrap();
+    let third = a.send(layers, P1).unwrap();
+    assert_eq!(third.counter, 3);
+
+    match session::adversary(&a, &third, layers, true).unwrap() {
+        Recovery::Plaintext(p) => assert_eq!(&p[..], P1),
+        other => panic!("expected full recovery at message 3, got {other:?}"),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The active attacker. A2 in the threat model, and the one layer 1942 lacked.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn unauthenticated_channel_is_read_by_the_machine_in_the_middle() {
+    let kem = k();
+    let layers = Layers { authenticate: false, ..Layers::default() };
+    let (mut victim, mut attacker) = session::establish_mitm(&*kem, layers, SUITE).unwrap();
+
+    let frame = victim.send(layers, P1).unwrap();
+    match session::adversary_mitm(&mut attacker, layers, &frame).unwrap() {
+        Recovery::MachineInTheMiddle(p) => assert_eq!(&p[..], P1),
+        other => panic!("expected the attacker to read it, got {other:?}"),
+    }
+
+    // A passive observer of the very same frame still gets nothing. The break is
+    // the missing authentication, not any weakness in the encryption.
+    assert_eq!(
+        session::adversary(&victim, &frame, layers, true).unwrap(),
+        Recovery::MetadataOnly
+    );
+}
+
+#[test]
+fn pinning_leaves_no_room_for_a_machine_in_the_middle() {
+    let kem = k();
+    assert!(session::establish_mitm(&*kem, Layers::default(), SUITE).is_err());
+    let layers = Layers { authenticate: false, ..Layers::default() };
+    let (_, mut attacker) = session::establish_mitm(&*kem, layers, SUITE).unwrap();
+    let mut victim = session::establish_mitm(&*kem, layers, SUITE).unwrap().0;
+    let frame = victim.send(layers, P1).unwrap();
+    assert!(session::adversary_mitm(&mut attacker, Layers::default(), &frame).is_err());
+}
+
+// ---------------------------------------------------------------------------
+// Feature honesty.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn pq_backend_reports_honestly_when_absent() {
+    let r = kem::backend("xwing");
+    #[cfg(feature = "pq")]
+    assert!(r.is_ok());
+    #[cfg(not(feature = "pq"))]
+    assert!(matches!(r, Err(codetalker_core::Error::BackendUnavailable(_))));
+}
+
+#[test]
+fn kem_reports_its_own_pq_status_truthfully() {
+    assert!(!kem::backend("x25519").unwrap().is_pq());
+    assert!(!kem::backend("static").unwrap().is_pq());
+    #[cfg(feature = "pq")]
+    assert!(kem::backend("xwing").unwrap().is_pq());
+}

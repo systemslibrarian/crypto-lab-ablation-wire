@@ -1,0 +1,175 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  core:
+    name: core (${{ matrix.features }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features: ["default", "pq", "classical,pq"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: |
+          if [ "${{ matrix.features }}" = "default" ]; then
+            cargo build -p codetalker-core
+          else
+            cargo build -p codetalker-core --no-default-features --features "${{ matrix.features }}"
+          fi
+
+      - name: Known-answer tests
+        run: |
+          if [ "${{ matrix.features }}" = "default" ]; then
+            cargo test -p codetalker-core
+          else
+            cargo test -p codetalker-core --no-default-features --features "${{ matrix.features }}"
+          fi
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+          targets: wasm32-unknown-unknown
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets -- -D warnings
+
+      # codetalker-wasm is `exclude`d from the root workspace, so neither of the
+      # commands above compiles a single line of it. That gap let the browser
+      # surface drift out of sync with codetalker-core until it no longer built
+      # at all, and nothing failed until someone tried to deploy. `-p` cannot
+      # reach an excluded package; --manifest-path can.
+      - run: cargo fmt --manifest-path codetalker-wasm/Cargo.toml -- --check
+      - run: >
+          cargo clippy --manifest-path codetalker-wasm/Cargo.toml
+          --target wasm32-unknown-unknown --all-targets -- -D warnings
+
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - run: wasm-pack build codetalker-wasm --target web --release
+      - uses: actions/upload-artifact@v4
+        with:
+          name: codetalker-wasm-pkg
+          path: codetalker-wasm/pkg/
+
+  supply-chain:
+    name: supply chain
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check advisories bans licenses sources
+
+  cbom:
+    name: cryptographic bill of materials
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: cargo install cargo-cyclonedx --locked
+      - run: cargo cyclonedx --format json --all
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cbom
+          path: "**/*.cdx.json"
+
+  secret-independence:
+    name: secret independence (libcrux)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      # Routes ring-element operations through libcrux-secrets and checks
+      # secret independence at compile time. Verifies the Rust, not the
+      # emitted machine code -- see THREAT_MODEL.md, adversary A5.
+      - run: cargo build -p codetalker-core --features pq,libcrux-ml-kem/check-secret-independence
+
+  fuzz:
+    name: fuzz (smoke)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz --locked
+      # Short run on every PR; the corpus grows via scheduled long runs.
+      - run: cargo fuzz run deobfuscate -- -max_total_time=60
+
+  mlkem-vectors:
+    name: FIPS 203 known-answer tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Fetch ACVP vectors
+        # internalProjection.json, not prompt.json. The prompt file carries the
+        # inputs and no expected answers, so a test fed that file can check the
+        # implementation does not crash and nothing else.
+        run: |
+          mkdir -p codetalker-core/tests/vectors
+          curl -fsSL -o codetalker-core/tests/vectors/mlkem768.json \
+            https://raw.githubusercontent.com/usnistgov/ACVP-Server/master/gen-val/json-files/ML-KEM-encapDecap-FIPS203/internalProjection.json
+      - run: cargo test -p codetalker-core --features pq --test kat -- --nocapture
+
+  deploy:
+    # Build the wasm module and publish the demo to GitHub Pages.
+    # Nothing here needs a server: wasm-pack output is static.
+    needs: [core, wasm, lint, supply-chain]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    # Two Pages deployments in flight at once fail each other. Queue rather
+    # than cancel: a superseded deploy still needs to finish releasing the
+    # environment lock.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: wasm32-unknown-unknown
+      - uses: jetli/wasm-pack-action@v0.4.0
+
+      - name: Build wasm (PQ enabled)
+        run: wasm-pack build codetalker-wasm --target web --release --out-dir ../web/pkg
+
+      - name: Disable Jekyll
+        # Without this, Pages runs the site through Jekyll, which silently
+        # drops any file or directory beginning with an underscore. wasm-pack
+        # emits several. This one line prevents a genuinely baffling 404.
+        run: touch web/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: web
+      - id: pages
+        uses: actions/deploy-pages@v4
