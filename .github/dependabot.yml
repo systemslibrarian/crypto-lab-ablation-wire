@@ -126,6 +126,22 @@ updates:
       prefix: "deps(fuzz)"
     labels: ["dependencies", "rust"]
     open-pull-requests-limit: 2
+    # `rand_core` is in the graph twice, on purpose: `rand_core = "0.6"` for this
+    # crate, and `rand_core_010 = { package = "rand_core", version = "0.10" }` for
+    # the libcrux RNG bridge in `kem::libcrux_rng`. Two majors of one crate under
+    # two names is legal and load-bearing here -- see codetalker-core/Cargo.toml.
+    #
+    # It is also unresolvable under `lockfile-only`. That strategy may not touch a
+    # manifest, so when Dependabot tries to move `rand_core` it cannot widen the
+    # `0.6` requirement to accommodate what it picked, and cargo fails the whole
+    # update with "failed to select a version for `rand_core`". The root entry has
+    # no such trouble because it is allowed to edit the requirement.
+    #
+    # Ignored here rather than dropping `lockfile-only`, because the alternative
+    # reintroduces the duplicate-manifest-PR problem this entry exists to solve.
+    # rand_core's version is the root entry's business either way.
+    ignore:
+      - dependency-name: "rand_core"
     groups:
       fuzz-lockfile:
         patterns: ["*"]
