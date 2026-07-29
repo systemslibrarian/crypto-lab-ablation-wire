@@ -68,6 +68,7 @@ fuzz/                cargo-fuzz target for transport::deobfuscate
 codetalker-wasm/     wasm-bindgen surface
 web/index.html       the ablation console
 web/pkg/             wasm-pack output, generated, not committed
+.github/check-artifact.sh   the Pages artifact resolves without reaching outside itself
 ```
 
 ## Features
@@ -103,8 +104,13 @@ cargo test                                   # classical
 cargo test --features pq                     # hybrid X-Wing
 cargo deny check                             # supply chain
 cargo +nightly fuzz run deobfuscate          # the untrusted parser
-wasm-pack build codetalker-wasm --target web --release
+wasm-pack build codetalker-wasm --target web --release --out-dir ../web/pkg
+.github/check-artifact.sh                    # the Pages artifact resolves
 ```
+
+Note the `--out-dir`. The deploy publishes `web/`, so that is where the module
+has to land; building into the default `codetalker-wasm/pkg` produces a module
+the demo cannot reach. CI uses the same flag for the same reason.
 
 MSRV is 1.85 with `pq` enabled, because libcrux uses edition 2024. The default
 feature set builds on considerably older toolchains.
@@ -215,6 +221,8 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | Secret independence | **fails, upstream cannot support it** — see Limitations |
 | `cargo audit` | no vulnerabilities; one unmaintained transitive crate, below |
 | `wasm-pack build` | 700 KB module, driven end to end across every ablation |
+| Deployed demo | **384 configurations driven on the published artifact** — every backend × both suites × all 64 layer combinations, none throwing, no console errors |
+| `check-artifact.sh` | every relative reference resolves inside `web/` |
 | `cargo fuzz` | 45,027,157 executions, no crashes |
 
 `cargo audit` reports `proc-macro-error2` as unmaintained (RUSTSEC-2026-0173).
@@ -224,7 +232,7 @@ build-time proc-macro that contributes no code to the compiled artifact. Noted
 rather than silenced, because the point of running the tool is to read what it
 says.
 
-Three things worth knowing about how this got here, because they were all
+Four things worth knowing about how this got here, because they were all
 invisible until something actually ran:
 
 **`--features pq` had never compiled.** `libcrux-kem` takes its RNG through
@@ -243,6 +251,19 @@ matches nothing is the same silent pass the loud panic exists to prevent.
 while both CI and this README invoked it from the repository root, where
 cargo-fuzz looks for `./fuzz`. It has been moved to the root and declares its
 own `[workspace]`.
+
+**The published page had broken links, and the job meant to catch that was
+looking elsewhere.** Pages serves `web/` as the site root, so the footer's
+`../README.md` resolved above it and 404ed — while resolving fine in a local
+editor preview, which is why it survived. A relative `./README.md` would have
+been worse: `web/` has its own README about the directory, so the link would
+have silently served the wrong document rather than failing. No favicon was
+declared either, leaving a 404 in the console of a page whose argument is that
+nothing on it is faked. Meanwhile the `wasm` job built into
+`codetalker-wasm/pkg` while `deploy` built into `web/pkg`, so the job
+responsible for the browser artifact was validating a build that lands where
+the site never reads from. `check-artifact.sh` now resolves every relative
+reference against `web/` and both jobs use the same `--out-dir`.
 
 ## Documents
 
