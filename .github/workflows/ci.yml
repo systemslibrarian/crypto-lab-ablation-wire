@@ -96,11 +96,24 @@ jobs:
           # the externref table that reference-types support produces. This is
           # the version the demo was actually verified against.
           version: 'v0.15.0'
-      - run: wasm-pack build codetalker-wasm --target web --release
+
+      # Same --out-dir as `deploy`. This job used to build into
+      # codetalker-wasm/pkg while deploy built into web/pkg, so the job that was
+      # supposed to be checking the browser artifact was checking a build that
+      # lands somewhere the site never reads from. Same shape as the two
+      # failures before it: CI verifying a near neighbour of the thing that
+      # ships.
+      - run: wasm-pack build codetalker-wasm --target web --release --out-dir ../web/pkg
+
+      # Runs here rather than in `deploy`, because `deploy` is main-only: a PR
+      # that broke the artifact would not learn about it until after merge.
+      - name: Artifact is self-contained
+        run: .github/check-artifact.sh
+
       - uses: actions/upload-artifact@v4
         with:
           name: codetalker-wasm-pkg
-          path: codetalker-wasm/pkg/
+          path: web/pkg/
 
   supply-chain:
     name: supply chain

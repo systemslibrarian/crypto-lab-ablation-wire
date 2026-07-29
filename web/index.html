@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>codetalker — layer ablation console</title>
 <meta name="description" content="Switch each layer of a secure channel off and watch what an adversary recovers. Real primitives, compiled to WebAssembly." />
+<!-- Inline, because the deploy artifact is `web/` and every request the page
+     makes has to resolve inside it. A missing favicon.ico is a 404 in the
+     console of a page whose whole argument is that nothing here is faked. -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%232f4f6f'/%3E%3Cpath d='M4 5h8M4 8h8M4 11h5' stroke='%23f7f8fa' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E" />
 <style>
 :root {
   /* Neutrals carry a slight blue bias so they sit with the steel accent
@@ -368,12 +372,6 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
 .history p { margin: 0 0 0.7rem; max-width: 68ch; }
 .history p:last-child { margin-bottom: 0; }
 .history strong { color: var(--ink); }
-.notice {
-  border: 1px solid var(--warn); background: var(--warn-wash);
-  border-radius: 4px; padding: 0.6rem 0.75rem; margin-top: 0.85rem;
-}
-.notice .eyebrow { color: var(--warn); }
-.notice p { margin: 0.25rem 0 0; font-size: var(--fs-xs); }
 
 /* -------------------------------------------------------------------- misc */
 
@@ -591,14 +589,6 @@ python3 -m http.server -d web 8080</pre>
           assembled the team — an operational failure on their side, not cryptographic strength
           on the Allied side.
         </p>
-        <div class="notice">
-          <div class="eyebrow">Before this goes anywhere public</div>
-          <p>
-            This material belongs to the Navajo Nation. The Navajo Code Talkers Museum and the
-            Navajo Nation Museum should be contacted and the framing reviewed by them first —
-            their involvement would be worth more than any technical feature in this repository.
-          </p>
-        </div>
       </div>
     </section>
 
@@ -607,7 +597,12 @@ python3 -m http.server -d web 8080</pre>
 
 <footer class="foot">
   <span>Every value on this page is computed by <code>codetalker-core</code> compiled to WebAssembly. The page renders; it decides nothing.</span>
-  <span><a href="../README.md">README</a> · <a href="../THREAT_MODEL.md">Threat model</a> · <a href="../SOURCES.md">Sources</a></span>
+  <!-- Absolute, and pointing at the repository rather than at this origin. The
+       deploy artifact is `web/`, so the repo-root documents are not part of the
+       published site at any path; `../README.md` resolved above the site root
+       and 404ed, and a relative `./README.md` would have quietly served the
+       one-paragraph README describing this directory instead. -->
+  <span><a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire/blob/main/README.md">README</a> · <a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire/blob/main/THREAT_MODEL.md">Threat model</a> · <a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire/blob/main/SOURCES.md">Sources</a></span>
 </footer>
 
 <script type="module">
