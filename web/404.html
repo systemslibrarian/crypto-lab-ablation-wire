@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Not found — codetalker</title>
+<meta name="robots" content="noindex" />
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%232f4f6f'/%3E%3Cpath d='M4 5h8M4 8h8M4 11h5' stroke='%23f7f8fa' stroke-width='1.5' stroke-linecap='round'/%3E%3C/svg%3E" />
+<!-- Standalone rather than sharing the console's stylesheet. A 404 that depends
+     on another file is a 404 that can render unstyled for the same reason it was
+     reached, and the whole page is smaller than the link tag's round trip. -->
+<style>
+:root {
+  --ground: #f7f8fa; --panel: #ffffff; --line: #d8dee8;
+  --ink: #171b22; --ink-2: #454e5e; --ink-3: #6d7789;
+  --accent: #4c7bb8; --accent-ink: #2f5d96;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font: 400 16px/1.6 ui-sans-serif, -apple-system, "Segoe UI", Helvetica, sans-serif;
+  background: var(--ground); color: var(--ink);
+  min-height: 100vh; display: grid; place-items: center; padding: 2rem;
+}
+main { max-width: 46ch; }
+.rule { height: 5px; width: 88px; background: var(--accent); border-radius: 3px; }
+h1 { font-size: clamp(1.9rem, 5vw, 2.6rem); line-height: 1.1; letter-spacing: -0.02em;
+     font-weight: 600; margin: 1.4rem 0 0; }
+p { color: var(--ink-2); margin-top: 1rem; }
+code { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 0.875em;
+       background: var(--panel); border: 1px solid var(--line);
+       border-radius: 3px; padding: 0.1em 0.35em; }
+a.back { display: inline-block; margin-top: 1.6rem; color: var(--accent-ink);
+         font-weight: 500; text-decoration: none;
+         border-bottom: 1px solid currentColor; padding-bottom: 1px; }
+a.back:hover { color: var(--ink); }
+.foot { margin-top: 2.2rem; padding-top: 1rem; border-top: 1px solid var(--line);
+        font-size: 0.8125rem; color: var(--ink-3); }
+.foot a { color: inherit; }
+@media (prefers-color-scheme: dark) {
+  :root { --ground: #14171c; --panel: #1c2027; --line: #2c323c;
+          --ink: #eef1f6; --ink-2: #b6bfcd; --ink-3: #8b95a6;
+          --accent: #6f9fd8; --accent-ink: #9dc0e8; }
+}
+</style>
+</head>
+<body>
+<main>
+  <div class="rule"></div>
+  <h1>No such page.</h1>
+  <p>
+    This site is a single page. The only other things it serves are the
+    WebAssembly module under <code>pkg/</code> and the image a link preview
+    fetches — so if you were sent here by a link to a document, it lives in the
+    repository rather than on this host.
+  </p>
+  <a class="back" href="/crypto-lab-ablation-wire/">Go to the ablation console</a>
+  <div class="foot">
+    <a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire">systemslibrarian/crypto-lab-ablation-wire</a>
+  </div>
+</main>
+</body>
+</html>

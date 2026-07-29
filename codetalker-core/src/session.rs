@@ -189,9 +189,10 @@ fn effective_kem(kem: &dyn Kem, layers: Layers) -> &dyn Kem {
 ///
 /// Returns the initiator's channel and the responder's, which must agree.
 ///
-/// When `layers.key_agreement` is false the `kem` argument is ignored and
-/// [`NO_AGREEMENT`] stands in, so `Handshake::kem_name` reports what the
-/// channel is really built on rather than what the caller asked for.
+/// When `layers.key_agreement` is false the `kem` argument is ignored and a
+/// [`StaticKem`](crate::kem::StaticKem) stands in, so
+/// [`Handshake::kem_name`](crate::handshake::Handshake::kem_name) reports what
+/// the channel is really built on rather than what the caller asked for.
 pub fn establish(kem: &dyn Kem, layers: Layers, suite: Suite) -> Result<(Channel, Channel)> {
     let kem = effective_kem(kem, layers);
     let identity = Identity::generate();

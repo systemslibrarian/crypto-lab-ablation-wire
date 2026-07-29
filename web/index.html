@@ -5,6 +5,23 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <title>codetalker — layer ablation console</title>
 <meta name="description" content="Switch each layer of a secure channel off and watch what an adversary recovers. Real primitives, compiled to WebAssembly." />
+
+<!-- Absolute URLs, because a scraper resolves these against its own notion of
+     the document and not against this page. `og:image` in particular is fetched
+     by a crawler that never loaded the HTML, so a relative path silently yields
+     a card with no image. Kept in one block so the canonical host appears
+     exactly four times and can be checked. -->
+<link rel="canonical" href="https://systemslibrarian.github.io/crypto-lab-ablation-wire/" />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://systemslibrarian.github.io/crypto-lab-ablation-wire/" />
+<meta property="og:site_name" content="codetalker" />
+<meta property="og:title" content="codetalker — layer ablation console" />
+<meta property="og:description" content="Switch each layer of a secure channel off and watch what an adversary recovers. Real primitives, compiled to WebAssembly." />
+<meta property="og:image" content="https://systemslibrarian.github.io/crypto-lab-ablation-wire/og.png" />
+<meta property="og:image:width" content="1200" />
+<meta property="og:image:height" content="630" />
+<meta property="og:image:alt" content="Five layer switches, one of them off, beside the title 'codetalker / ablation console'." />
+<meta name="twitter:card" content="summary_large_image" />
 <!-- Inline, because the deploy artifact is `web/` and every request the page
      makes has to resolve inside it. A missing favicon.ico is a 404 in the
      console of a page whose whole argument is that nothing here is faked. -->

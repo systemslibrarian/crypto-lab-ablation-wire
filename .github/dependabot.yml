@@ -1,0 +1,62 @@
+version: 2
+
+# The reason this file exists at all: `ci.yml` pins every action to a commit
+# SHA, and a pinned SHA nobody ever moves is a stale dependency with a
+# reassuring comment next to it. Pinning without automated updates trades one
+# failure mode for a slower one. Both halves or neither.
+#
+# Dependabot rewrites the SHA *and* the trailing `# vX.Y.Z` comment together,
+# which is the property that makes the pins readable rather than opaque.
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "ci"
+    labels: ["dependencies", "github-actions"]
+
+  # Three separate Cargo manifests, and none of them is reachable from the
+  # others. codetalker-wasm is `exclude`d from the root workspace and fuzz/
+  # declares its own `[workspace]`, so a single root entry would leave the crate
+  # the browser actually runs -- and the one that links libFuzzer -- unwatched.
+  # This is the same gap that let the wasm surface drift out of sync until it no
+  # longer built: tooling pointed at the workspace does not see either of them.
+  - package-ecosystem: cargo
+    directory: "/"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps"
+    labels: ["dependencies", "rust"]
+    groups:
+      # RustCrypto's traits move in lockstep; separate PRs for each would not
+      # compile on their own.
+      rustcrypto:
+        patterns:
+          - "aes-gcm"
+          - "chacha20poly1305"
+          - "hkdf"
+          - "sha2"
+          - "digest"
+          - "subtle"
+          - "zeroize"
+      libcrux:
+        patterns:
+          - "libcrux-*"
+
+  - package-ecosystem: cargo
+    directory: "/codetalker-wasm"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(wasm)"
+    labels: ["dependencies", "rust", "wasm"]
+
+  - package-ecosystem: cargo
+    directory: "/fuzz"
+    schedule:
+      interval: weekly
+    commit-message:
+      prefix: "deps(fuzz)"
+    labels: ["dependencies", "rust"]

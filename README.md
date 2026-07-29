@@ -64,7 +64,7 @@ codetalker-core/
   tests/kat.rs       published known-answer vectors
   tests/ablation.rs  one test per claim the demo makes in prose
   tests/properties.rs proptest coverage of the untrusted parser
-fuzz/                cargo-fuzz target for transport::deobfuscate
+fuzz/                cargo-fuzz targets: transport::deobfuscate, identity::verify
 codetalker-wasm/     wasm-bindgen surface
 web/index.html       the ablation console
 web/pkg/             wasm-pack output, generated, not committed
@@ -103,7 +103,8 @@ shipping in Firefox.
 cargo test                                   # classical
 cargo test --features pq                     # hybrid X-Wing
 cargo deny check                             # supply chain
-cargo +nightly fuzz run deobfuscate          # the untrusted parser
+cargo +nightly fuzz run deobfuscate          # the framing parser
+cargo +nightly fuzz run identity_verify --features pq   # the signature verifier
 wasm-pack build codetalker-wasm --target web --release --out-dir ../web/pkg
 .github/check-artifact.sh                    # the Pages artifact resolves
 ```
@@ -223,7 +224,10 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | `wasm-pack build` | 700 KB module, driven end to end across every ablation |
 | Deployed demo | **384 configurations driven on the published artifact** — every backend × both suites × all 64 layer combinations, none throwing, no console errors |
 | `check-artifact.sh` | every relative reference resolves inside `web/` |
-| `cargo fuzz` | 45,027,157 executions, no crashes |
+| `cargo fuzz deobfuscate` | 45,027,157 executions, no crashes |
+| `cargo fuzz identity_verify` | 577,993 classical + 608,145 with `pq`, no crashes |
+| Actions pinned | every workflow action pinned to a commit SHA, Dependabot moves them |
+| `forbid(unsafe_code)` | enforced by the compiler, not asserted in prose |
 
 `cargo audit` reports `proc-macro-error2` as unmaintained (RUSTSEC-2026-0173).
 It arrives through `hax-lib-macros` — part of the formal-verification toolchain
@@ -232,7 +236,7 @@ build-time proc-macro that contributes no code to the compiled artifact. Noted
 rather than silenced, because the point of running the tool is to read what it
 says.
 
-Four things worth knowing about how this got here, because they were all
+Five things worth knowing about how this got here, because they were all
 invisible until something actually ran:
 
 **`--features pq` had never compiled.** `libcrux-kem` takes its RNG through
@@ -265,7 +269,26 @@ responsible for the browser artifact was validating a build that lands where
 the site never reads from. `check-artifact.sh` now resolves every relative
 reference against `web/` and both jobs use the same `--out-dir`.
 
+**The fuzzer was documented as covering the only untrusted parser, and there
+were two.** `deobfuscate.rs` opened by describing itself that way. But
+`handshake::initiate` hands `identity::verify` three slices lifted straight off
+the wire -- the claimed identity key, the transcript hash, and the signature --
+and they reach `VerifyingKey::from_bytes`, `MLDSA65VerificationKey::new` and
+libcrux's ML-DSA verifier. That is the larger surface and the more critical one,
+and nothing was fuzzing it. `identity_verify.rs` now does, in two modes: wholly
+arbitrary slices, and a genuine key/message/signature triple with one field
+mutated in place so lengths stay valid and the verifier reaches its arithmetic
+rather than bailing at a length check.
+
+Writing it reproduced the same failure in miniature. The target guarded its
+Ed25519 arm with `#[cfg(feature = "classical")]`, but `feature` in a fuzz target
+resolves against the *fuzz* crate, which had no such feature -- so the arm
+compiled, ran, and did nothing. Only `unexpected_cfgs` caught it. The fuzz crate
+now mirrors codetalker-core's feature names so the gate means what it reads as
+meaning.
+
 ## Documents
 
 - [THREAT_MODEL.md](THREAT_MODEL.md) — adversaries A1–A5, and which configurations survive each
+- [SECURITY.md](SECURITY.md) — why not to deploy this, and what does count as a vulnerability
 - [SOURCES.md](SOURCES.md) — historical citations and specifications implemented

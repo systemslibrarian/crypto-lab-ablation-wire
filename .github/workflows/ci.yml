@@ -17,11 +17,12 @@ jobs:
       matrix:
         features: ["default", "classical", "pq", "classical,pq"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
         with:
+          toolchain: stable
           components: clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
 
       # Every leg of this matrix builds, tests *and* lints. The `pq` leg in
       # particular had never compiled: `Identity` was gated on `classical`
@@ -52,20 +53,21 @@ jobs:
       matrix:
         rust: ["1.85"]
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
         with:
           toolchain: ${{ matrix.rust }}
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
       # The README pins this. A pinned MSRV nobody compiles against is a guess.
       - run: cargo build -p codetalker-core --no-default-features --features classical,pq
 
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
         with:
+          toolchain: stable
           components: clippy, rustfmt
           targets: wasm32-unknown-unknown
       - run: cargo fmt --all -- --check
@@ -84,11 +86,12 @@ jobs:
   wasm:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
         with:
+          toolchain: stable
           targets: wasm32-unknown-unknown
-      - uses: jetli/wasm-pack-action@v0.4.0
+      - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa # v0.4.0
         with:
           # Pinned, not 'latest'. The action's default installed a wasm-pack
           # whose bundled wasm-opt could not parse what wasm-bindgen 0.2.126
@@ -110,7 +113,7 @@ jobs:
       - name: Artifact is self-contained
         run: .github/check-artifact.sh
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: codetalker-wasm-pkg
           path: web/pkg/
@@ -119,9 +122,11 @@ jobs:
     name: supply chain
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2.1.1
         with:
           # --all-features stated explicitly because it is load-bearing and was
           # previously implicit. The action defaults to it; a local `cargo deny
@@ -137,8 +142,10 @@ jobs:
     name: rustsec advisories
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
       - run: cargo install cargo-audit --locked
       # `cargo deny check advisories` reads the same database, but only for the
       # workspace. This also covers codetalker-wasm, which is excluded from it
@@ -150,11 +157,13 @@ jobs:
     name: cryptographic bill of materials
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
       - run: cargo install cargo-cyclonedx --locked
       - run: cargo cyclonedx --format json --all
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: cbom
           path: "**/*.cdx.json"
@@ -179,26 +188,46 @@ jobs:
     # attempts the check and genuinely reports that upstream cannot support it.
     continue-on-error: true
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
       - run: cargo build -p codetalker-core --features check-secret-independence
 
   fuzz:
-    name: fuzz (smoke)
+    name: fuzz (smoke, ${{ matrix.target }})
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: deobfuscate
+            args: ""
+          # `--features pq` is not decoration here. The fuzz crate mirrors
+          # codetalker-core's feature names, and without it the ML-DSA-65 arm is
+          # compiled out: a local run measured coverage at 971 without the flag
+          # and 9,140 with it, on the same target and the same seed corpus. The
+          # post-quantum verifier is the larger parser of the two, so fuzzing
+          # only the classical arm would leave the newer code unexercised.
+          - target: identity_verify
+            args: "--features pq"
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@nightly
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: nightly
       - run: cargo install cargo-fuzz --locked
       # Short run on every PR; the corpus grows via scheduled long runs.
-      - run: cargo fuzz run deobfuscate -- -max_total_time=60
+      - run: cargo fuzz run ${{ matrix.target }} ${{ matrix.args }} -- -max_total_time=60
 
   nist-vectors:
     name: FIPS 203 / 204 known-answer tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
       - name: Fetch ACVP vectors
         run: .github/fetch-vectors.sh
       - run: cargo test -p codetalker-core --features pq --test kat -- --nocapture
@@ -222,11 +251,12 @@ jobs:
       name: github-pages
       url: ${{ steps.pages.outputs.page_url }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
         with:
+          toolchain: stable
           targets: wasm32-unknown-unknown
-      - uses: jetli/wasm-pack-action@v0.4.0
+      - uses: jetli/wasm-pack-action@0d096b08b4e5a7de8c28de67e11e945404e9eefa # v0.4.0
         with:
           # Pinned, not 'latest'. The action's default installed a wasm-pack
           # whose bundled wasm-opt could not parse what wasm-bindgen 0.2.126
@@ -244,9 +274,9 @@ jobs:
         # emits several. This one line prevents a genuinely baffling 404.
         run: touch web/.nojekyll
 
-      - uses: actions/configure-pages@v5
-      - uses: actions/upload-pages-artifact@v3
+      - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
+      - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: web
       - id: pages
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0

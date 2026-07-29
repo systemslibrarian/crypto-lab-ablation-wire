@@ -12,13 +12,35 @@ publish = false
 [package.metadata]
 cargo-fuzz = true
 
+[features]
+# These mirror codetalker-core's feature names deliberately. A fuzz target that
+# writes `#[cfg(feature = "classical")]` is testing *this* crate's feature list,
+# not the core crate's -- so without a passthrough of the same name the cfg is
+# simply never true and the branch behind it never runs. That is the silent-pass
+# failure mode the whole repository is organised against, and it happened here:
+# the Ed25519 arm of identity_verify compiled, ran, and did nothing until
+# `unexpected_cfgs` pointed at it.
+default = ["classical"]
+classical = ["codetalker-core/classical"]
+# `--features pq` reaches the ML-DSA-65 verifier as well as the Ed25519 one.
+# Without it the post-quantum signature path -- the newer of the two, and the
+# one with the larger parser -- is unreachable from any fuzz target.
+pq = ["codetalker-core/pq"]
+
 [dependencies]
 libfuzzer-sys = "0.4"
-codetalker-core = { path = "../codetalker-core" }
+codetalker-core = { path = "../codetalker-core", default-features = false }
 
 [[bin]]
 name = "deobfuscate"
 path = "fuzz_targets/deobfuscate.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "identity_verify"
+path = "fuzz_targets/identity_verify.rs"
 test = false
 doc = false
 bench = false

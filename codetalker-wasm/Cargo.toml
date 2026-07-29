@@ -1,8 +1,13 @@
 [package]
 name = "codetalker-wasm"
+description = "Browser surface for the codetalker layer-ablation console."
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
+# Spelled out rather than inherited: this crate is `exclude`d from the root
+# workspace, so `.workspace = true` has no workspace to read from here. Same
+# reason `lint` has to reach it with --manifest-path.
+repository = "https://github.com/systemslibrarian/crypto-lab-ablation-wire"
 rust-version = "1.85"
 
 [lib]

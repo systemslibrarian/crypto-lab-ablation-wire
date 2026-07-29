@@ -19,6 +19,10 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 SITE="$ROOT/web"
 HTML="$SITE/index.html"
+# The canonical origin. Social metadata has to be absolute, so this string is
+# duplicated between here and the HTML by necessity; the check below is what
+# keeps the duplication from drifting.
+ORIGIN="https://systemslibrarian.github.io/crypto-lab-ablation-wire"
 fail=0
 
 note() { printf '  %s\n' "$1"; }
@@ -85,6 +89,75 @@ if [ -e "$SITE/.nojekyll" ]; then
   note "ok                .nojekyll committed"
 else
   note "MISSING           web/.nojekyll"
+  fail=1
+fi
+
+# GitHub Pages serves /404.html for any unmatched path. Without one it serves
+# its own generic page, which is unbranded and links nowhere useful.
+echo "--- 404 ---"
+if [ -e "$SITE/404.html" ]; then
+  note "ok                404.html present"
+else
+  note "MISSING           web/404.html -- Pages will serve its own generic page"
+  fail=1
+fi
+
+# Social metadata is the one place in this artifact where a *relative* path is
+# the bug. The crawler that fetches og:image never loaded the HTML, so it has no
+# base to resolve against and simply renders a card with no image -- visible only
+# by pasting the link somewhere, which is not a thing CI can do. So: assert the
+# tags exist, assert they are absolute, and assert the file each one points at
+# is actually in the artifact.
+echo "--- social metadata ---"
+for prop in "og:title" "og:description" "og:url" "og:image"; do
+  if grep -q "property=\"$prop\"" "$HTML"; then
+    note "ok                $prop declared"
+  else
+    note "MISSING           $prop"
+    fail=1
+  fi
+done
+
+if grep -q 'rel="canonical"' "$HTML"; then
+  note "ok                canonical declared"
+else
+  note "MISSING           rel=\"canonical\""
+  fail=1
+fi
+
+# Every absolute self-reference must name the canonical origin, and must resolve
+# to a file that ships. A card pointing at a 404 is worse than no card: it looks
+# configured.
+while read -r url; do
+  [ -z "$url" ] && continue
+  case "$url" in
+    "$ORIGIN"*)
+      rel="${url#"$ORIGIN"}"; rel="${rel#/}"
+      if [ -z "$rel" ] || [ -e "$SITE/$rel" ]; then
+        note "ok                $url"
+      else
+        note "MISSING           $url"
+        note "                  expected at web/$rel"
+        fail=1
+      fi
+      ;;
+    *)
+      note "WRONG ORIGIN      $url"
+      note "                  social metadata must use $ORIGIN"
+      fail=1
+      ;;
+  esac
+done <<EOF
+$(grep -oE '(property="og:(url|image)"|rel="canonical")[^>]*' "$HTML" \
+  | grep -oE '(href|content)="[^"]+"' \
+  | sed -E 's/^(href|content)="//; s/"$//' \
+  | grep -E '^https?:' | sort -u)
+EOF
+
+# A relative og:image is the specific silent failure described above, so it is
+# worth naming rather than folding into the loop.
+if grep -E 'property="og:image"' "$HTML" | grep -qvE 'content="https?:'; then
+  note "RELATIVE og:image the crawler has no base to resolve it against"
   fail=1
 fi
 

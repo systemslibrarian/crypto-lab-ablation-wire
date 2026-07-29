@@ -4,6 +4,7 @@ description = "Layer-ablation secure channel: the 1942 code-talker stack, rebuil
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+repository.workspace = true
 # The `pq` feature pulls libcrux, which uses edition 2024.
 rust-version = "1.85"
 
