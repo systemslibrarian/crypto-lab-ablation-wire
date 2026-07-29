@@ -103,6 +103,14 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
+          # --all-features stated explicitly because it is load-bearing and was
+          # previously implicit. The action defaults to it; a local `cargo deny
+          # check` does not. That difference meant the local run resolved only
+          # the default feature set and never examined the `pq` tree -- the one
+          # holding the post-quantum crates -- so it reported clean while CI
+          # failed on the same commit. Same flags in both places, or the local
+          # check is theatre.
+          arguments: --all-features
           command: check advisories bans licenses sources
 
   audit:
@@ -132,16 +140,28 @@ jobs:
           path: "**/*.cdx.json"
 
   secret-independence:
-    name: secret independence (libcrux)
+    name: secret independence (known upstream breakage)
     runs-on: ubuntu-latest
+    # Expected to fail, and kept so the failure stays visible.
+    #
+    # The intent: route libcrux's ring-element operations through
+    # libcrux-secrets and have the compiler check secret independence. The
+    # obstacle: `libcrux-kem` 0.0.9 has no `check-secret-independence` feature,
+    # so with the mode enabled on `libcrux-ml-kem` its own callers no longer
+    # typecheck -- it passes `[u8; 32]` where `Secret<u8>` is now expected.
+    # That is upstream code, not this crate's, and not fixable from here short
+    # of bypassing libcrux-kem entirely.
+    #
+    # The previous version of this job was worse than broken: it named a
+    # feature on a package that was not a direct dependency, so it failed
+    # instantly with "does not contain this feature" while THREAT_MODEL.md
+    # cited it as evidence of a check being performed. It now genuinely
+    # attempts the check and genuinely reports that upstream cannot support it.
     continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      # Routes ring-element operations through libcrux-secrets and checks
-      # secret independence at compile time. Verifies the Rust, not the
-      # emitted machine code -- see THREAT_MODEL.md, adversary A5.
-      - run: cargo build -p codetalker-core --features pq,libcrux-ml-kem/check-secret-independence
+      - run: cargo build -p codetalker-core --features check-secret-independence
 
   fuzz:
     name: fuzz (smoke)

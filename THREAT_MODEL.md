@@ -52,7 +52,15 @@ is. `Handshake::is_fully_pq()` requires both halves, and the demo shows two
 badges rather than one.
 
 **A5 — local side-channel observer.** Measures timing or cache behaviour on the
-same machine. **Not defended against.** See Limitations.
+same machine. **Not defended against**, and not measured either.
+
+An earlier version of this document cited a `check-secret-independence` CI job
+as evidence that the Rust was checked even though the emitted machine code was
+not. That job had never run: it named a cargo feature on a package that was not
+a direct dependency and failed instantly. The check is now genuinely attempted
+and genuinely fails, because `libcrux-kem` does not support the mode that
+`libcrux-ml-kem` provides. Nothing about A5 is verified. See Limitations in the
+README.
 
 ## What each configuration survives
 

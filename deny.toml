@@ -6,6 +6,33 @@
 db-urls = ["https://github.com/rustsec/advisory-db"]
 yanked = "deny"
 
+# Stated explicitly rather than inherited. cargo-deny's default for
+# `unmaintained` has changed across releases, so leaving it unset meant the
+# policy depended on which version happened to run: a local 0.20.2 reported
+# "advisories ok" while the CI action failed the same tree. A supply-chain
+# policy whose strictness varies by toolchain version is not a policy.
+unmaintained = "all"
+
+ignore = [
+  # proc-macro-error2 is unmaintained, and so is the crate it forked.
+  #
+  # It reaches this tree as: libcrux-ml-dsa -> libcrux-intrinsics ->
+  # core-models -> hax-lib -> hax-lib-macros -> proc-macro-error2.
+  #
+  # That path is worth reading twice, because it is the cost of the thing this
+  # crate chose libcrux *for*: hax is the formal-verification toolchain behind
+  # the F* proofs of ML-KEM and ML-DSA. The unmaintained crate is a build-time
+  # proc-macro used by that tooling. It emits no code into the compiled
+  # artifact, it never runs on a user's machine, and it cannot process
+  # attacker-controlled input.
+  #
+  # Accepted with the path written down rather than waved away, and scoped to
+  # this one advisory so the next unmaintained crate still fails the build.
+  # Revisit if hax moves off it or if this becomes a vulnerability rather than
+  # a maintenance advisory.
+  { id = "RUSTSEC-2026-0173", reason = "build-time proc-macro from the hax verification toolchain; not in the artifact" },
+]
+
 [bans]
 multiple-versions = "warn"
 wildcards = "deny"
