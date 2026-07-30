@@ -1,0 +1,97 @@
+name: fuzz (scheduled)
+
+# This workflow exists because `ci.yml` claimed it did.
+#
+# The smoke job there carried the comment "the corpus grows via scheduled long
+# runs" while no scheduled workflow existed anywhere in this repository, and
+# `/fuzz/corpus` was gitignored -- so nothing persisted between runs and every
+# invocation started from an empty corpus. "45,027,157 executions" read as
+# accumulated depth and was in fact sixty seconds from scratch, repeated.
+#
+# That is the same species of defect as the KAT that verified a file existed and
+# the fuzz target that could not have run: a claim that reads as a check. The
+# choice was to delete the sentence or make it true. Coverage-guided fuzzing is
+# worth very little without a corpus that accumulates, so: true.
+
+on:
+  schedule:
+    # 03:17 UTC daily. Off the hour deliberately -- scheduled jobs at :00 queue
+    # behind everyone else's cron and start late or get dropped.
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: "Minutes to fuzz each target"
+        required: false
+        default: "20"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: deobfuscate
+            args: ""
+          - target: identity_verify
+            args: "--features pq"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: nightly
+
+      # The rolling-key pattern: the save key is unique per run so every run
+      # writes a new entry, and `restore-keys` prefix-matches the most recent
+      # previous one. A fixed key would restore on the first run and then never
+      # update, which is a corpus that looks persisted and is frozen.
+      - name: Restore corpus
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: fuzz/corpus/${{ matrix.target }}
+          key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
+          restore-keys: |
+            fuzz-corpus-${{ matrix.target }}-
+
+      - run: cargo install cargo-fuzz --locked
+
+      - name: Corpus size on entry
+        id: before
+        run: |
+          mkdir -p "fuzz/corpus/${{ matrix.target }}"
+          n=$(find "fuzz/corpus/${{ matrix.target }}" -type f | wc -l | tr -d ' ')
+          echo "count=$n" >> "$GITHUB_OUTPUT"
+          echo "corpus entering this run: $n inputs"
+
+      - name: Fuzz
+        run: |
+          mins="${{ github.event.inputs.minutes || '20' }}"
+          cargo fuzz run ${{ matrix.target }} ${{ matrix.args }} -- \
+            -max_total_time=$(( mins * 60 )) \
+            -print_final_stats=1
+
+      # Minimise before saving, or the corpus grows without bound and every
+      # future run spends its budget replaying redundant inputs.
+      - name: Minimise corpus
+        run: cargo fuzz cmin ${{ matrix.target }} ${{ matrix.args }}
+
+      - name: Corpus growth
+        run: |
+          n=$(find "fuzz/corpus/${{ matrix.target }}" -type f | wc -l | tr -d ' ')
+          echo "### ${{ matrix.target }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "corpus: ${{ steps.before.outputs.count }} -> $n inputs" >> "$GITHUB_STEP_SUMMARY"
+
+      # A crash is the entire point of the exercise, so it must leave the
+      # workflow with evidence attached rather than only a red mark.
+      - name: Upload crashes
+        if: failure()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: fuzz-artifacts-${{ matrix.target }}
+          path: fuzz/artifacts/${{ matrix.target }}/
+          if-no-files-found: ignore

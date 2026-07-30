@@ -217,8 +217,60 @@ jobs:
         with:
           toolchain: nightly
       - run: cargo install cargo-fuzz --locked
-      # Short run on every PR; the corpus grows via scheduled long runs.
+      # Sixty seconds from an empty corpus, which finds shallow crashes and
+      # nothing else. The depth comes from `fuzz.yml`, which runs nightly against
+      # a corpus cached between runs. This comment used to claim that workflow
+      # existed before it did.
       - run: cargo fuzz run ${{ matrix.target }} ${{ matrix.args }} -- -max_total_time=60
+
+  coverage:
+    name: coverage
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@2c7215f132e9ebf062739d9130488b56d53c060c # master
+        with:
+          toolchain: stable
+          components: llvm-tools-preview
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - run: cargo install cargo-llvm-cov --locked
+
+      - name: Fetch known-answer vectors
+        run: .github/fetch-vectors.sh
+
+      # `classical,pq` rather than --all-features, because --all-features pulls
+      # `check-secret-independence` and that does not build -- see the job of the
+      # same name. This is the widest feature set that compiles.
+      - name: Measure
+        run: |
+          cargo llvm-cov -p codetalker-core \
+            --no-default-features --features classical,pq \
+            --summary-only --json --output-path coverage.json
+          cargo llvm-cov -p codetalker-core \
+            --no-default-features --features classical,pq \
+            --summary-only --no-run
+
+      # A floor, not a target. Set just under the measured value so it catches a
+      # real regression without inviting tests written to colour a report green.
+      # Coverage that gets chased is coverage that stops meaning anything.
+      - name: Floor
+        run: |
+          pct=$(python3 -c "import json;print(json.load(open('coverage.json'))['data'][0]['totals']['lines']['percent'])")
+          printf 'line coverage: %.2f%%\n' "$pct"
+          echo "line coverage: $(printf '%.2f' "$pct")%" >> "$GITHUB_STEP_SUMMARY"
+          python3 -c "
+import sys
+pct = $pct
+floor = 80.0
+if pct < floor:
+    sys.exit(f'coverage {pct:.2f}% fell below the {floor}% floor')
+print(f'{pct:.2f}% >= {floor}% floor')
+"
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: coverage
+          path: coverage.json
 
   nist-vectors:
     name: FIPS 203 / 204 known-answer tests
@@ -241,6 +293,11 @@ jobs:
     permissions:
       pages: write
       id-token: write
+      # Signing the wasm module needs to write an attestation to the repository's
+      # attestation store. `id-token: write` above was already present for Pages
+      # and is also what lets Sigstore mint a short-lived signing identity.
+      attestations: write
+      contents: read
     # Two Pages deployments in flight at once fail each other. Queue rather
     # than cancel: a superseded deploy still needs to finish releasing the
     # environment lock.
@@ -267,6 +324,20 @@ jobs:
 
       - name: Build wasm (PQ enabled)
         run: wasm-pack build codetalker-wasm --target web --release --out-dir ../web/pkg
+
+      # Everything above this line guards what comes *in* -- pinned actions,
+      # cargo-deny, cargo-audit, a bill of materials. None of it says anything
+      # about what goes *out*. This is the other half: a signed, verifiable
+      # statement that the wasm a reader's browser executes was produced by this
+      # workflow, from this commit, and not substituted afterwards.
+      #
+      # Verify a downloaded module with:
+      #   gh attestation verify codetalker_wasm_bg.wasm \
+      #     --repo systemslibrarian/crypto-lab-ablation-wire
+      - name: Attest the module the browser runs
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: web/pkg/codetalker_wasm_bg.wasm
 
       - name: Disable Jekyll
         # Without this, Pages runs the site through Jekyll, which silently

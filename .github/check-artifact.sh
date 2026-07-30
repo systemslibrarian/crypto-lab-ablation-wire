@@ -92,6 +92,31 @@ else
   fail=1
 fi
 
+# The README quotes a module size. A number in prose that nothing measures drifts
+# the moment a dependency grows, and this one is load-bearing: it is the download
+# every visitor pays before the page can render anything at all.
+#
+# A ceiling, not an assertion of the current value -- it should fail on a jump
+# that wants explaining, not on ordinary movement. RustCrypto 0.11 moved it from
+# 699,887 to 706,480 bytes, which is exactly the kind of change that should pass
+# quietly.
+echo "--- module size ---"
+WASM="$SITE/pkg/codetalker_wasm_bg.wasm"
+BUDGET=900000
+if [ -e "$WASM" ]; then
+  size=$(wc -c < "$WASM" | tr -d ' ')
+  if [ "$size" -le "$BUDGET" ]; then
+    note "ok                $((size / 1000)) kB, budget $((BUDGET / 1000)) kB"
+  else
+    note "OVER BUDGET       $((size / 1000)) kB exceeds $((BUDGET / 1000)) kB"
+    note "                  every visitor downloads this before the page renders"
+    fail=1
+  fi
+else
+  note "MISSING           pkg/codetalker_wasm_bg.wasm -- run wasm-pack first"
+  fail=1
+fi
+
 # GitHub Pages serves /404.html for any unmatched path. Without one it serves
 # its own generic page, which is unbranded and links nowhere useful.
 echo "--- 404 ---"

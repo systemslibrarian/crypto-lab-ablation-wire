@@ -107,6 +107,8 @@ cargo +nightly fuzz run deobfuscate          # the framing parser
 cargo +nightly fuzz run identity_verify --features pq   # the signature verifier
 wasm-pack build codetalker-wasm --target web --release --out-dir ../web/pkg
 .github/check-artifact.sh                    # the Pages artifact resolves
+cargo llvm-cov -p codetalker-core --no-default-features --features classical,pq \
+  --summary-only                             # coverage; CI floors this at 80%
 ```
 
 Note the `--out-dir`. The deploy publishes `web/`, so that is where the module
@@ -235,6 +237,10 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | `check-artifact.sh` | every relative reference resolves inside `web/` |
 | `cargo fuzz deobfuscate` | 45,027,157 executions, no crashes |
 | `cargo fuzz identity_verify` | 577,993 classical + 608,145 with `pq`, no crashes |
+| Scheduled fuzzing | nightly, 20 min per target, **against a corpus cached between runs** |
+| Line coverage | **83.36%** (81.30% region, 80.00% function), floored at 80% in CI |
+| Build provenance | the published wasm module is signed; `gh attestation verify` checks it |
+| Module size | 706 kB, budgeted at 900 kB by `check-artifact.sh` |
 | Actions pinned | every workflow action pinned to a commit SHA, Dependabot moves them |
 | `forbid(unsafe_code)` | enforced by the compiler, not asserted in prose |
 | RustCrypto 0.11 / dalek 3.0 | migrated; every published vector still reproduces byte for byte |
@@ -246,7 +252,7 @@ build-time proc-macro that contributes no code to the compiled artifact. Noted
 rather than silenced, because the point of running the tool is to read what it
 says.
 
-Five things worth knowing about how this got here, because they were all
+Six things worth knowing about how this got here, because they were all
 invisible until something actually ran:
 
 **`--features pq` had never compiled.** `libcrux-kem` takes its RNG through
@@ -299,6 +305,21 @@ resolves against the *fuzz* crate, which had no such feature -- so the arm
 compiled, ran, and did nothing. Only `unexpected_cfgs` caught it. The fuzz crate
 now mirrors codetalker-core's feature names so the gate means what it reads as
 meaning.
+
+**The fuzzing depth was a sentence, not a fact.** `ci.yml` carried the comment
+"Short run on every PR; the corpus grows via scheduled long runs" — and no
+scheduled workflow existed anywhere in the repository. `/fuzz/corpus` is
+gitignored besides, so nothing persisted between runs even in principle. Every
+invocation started from an empty corpus and ran for sixty seconds. The figure in
+the table above reads as accumulated depth and was nothing of the kind.
+
+Coverage-guided fuzzing without an accumulating corpus is close to random
+testing: the whole mechanism is that inputs reaching new edges get saved and
+mutated further. So the sentence was made true rather than deleted —
+`fuzz.yml` runs nightly, twenty minutes per target, restoring and saving the
+corpus through a rolling cache key and minimising it with `cargo fuzz cmin`
+before each save so it does not grow into replay. A fixed cache key would have
+been the same bug in a new place: restored once, then frozen.
 
 ## Documents
 
