@@ -95,7 +95,7 @@ impl Kem for X25519Kem {
 
     fn keygen(&self) -> Result<(SecretKey, PublicKey)> {
         use x25519_dalek::{PublicKey as XPk, StaticSecret};
-        let sk = StaticSecret::random_from_rng(rand_core::OsRng);
+        let sk = StaticSecret::random_from_rng(&mut os_rng::OsRng);
         let pk = XPk::from(&sk);
         Ok((
             SecretKey(sk.to_bytes().to_vec()),
@@ -109,7 +109,7 @@ impl Kem for X25519Kem {
             pk.0.as_slice()
                 .try_into()
                 .map_err(|_| Error::Kem("bad public key length"))?;
-        let eph = EphemeralSecret::random_from_rng(rand_core::OsRng);
+        let eph = EphemeralSecret::random_from_rng(&mut os_rng::OsRng);
         let eph_pk = XPk::from(&eph);
         let ss = eph.diffie_hellman(&XPk::from(peer));
         if !ss.was_contributory() {
@@ -149,8 +149,17 @@ impl Kem for X25519Kem {
 /// source of randomness for the whole crate.
 ///
 /// This adds no logic of its own: every method delegates straight to `OsRng`.
-#[cfg(feature = "pq")]
-mod libcrux_rng {
+///
+/// It was `libcrux_rng` and gated on `pq` while libcrux was the only caller.
+/// x25519-dalek 3.0 also moved to `rand_core` 0.10, so the classical KEM now
+/// needs the identical bridge and the name no longer describes it. Nothing about
+/// the implementation changed — only who asks.
+///
+/// The `CryptoRng` that dalek wants comes for free: `rand_core` 0.10 blanket-impls
+/// `Rng` for any `TryRng<Error = Infallible>` and `CryptoRng` for any
+/// `TryCryptoRng<Error = Infallible>`, both of which this already is.
+#[cfg(any(feature = "classical", feature = "pq"))]
+mod os_rng {
     use rand_core::RngCore as _;
 
     pub struct OsRng;
@@ -189,7 +198,7 @@ impl Kem for XWingKem {
     }
 
     fn keygen(&self) -> Result<(SecretKey, PublicKey)> {
-        let (sk, pk) = libcrux_kem::key_gen(libcrux_kem::Algorithm::XWingKemDraft06, &mut libcrux_rng::OsRng)
+        let (sk, pk) = libcrux_kem::key_gen(libcrux_kem::Algorithm::XWingKemDraft06, &mut os_rng::OsRng)
             .map_err(|_| Error::Kem("keygen"))?;
         Ok((SecretKey(sk.encode()), PublicKey(pk.encode())))
     }
@@ -198,7 +207,7 @@ impl Kem for XWingKem {
         let pk = libcrux_kem::PublicKey::decode(libcrux_kem::Algorithm::XWingKemDraft06, &pk.0)
             .map_err(|_| Error::Kem("decode public key"))?;
         let (ss, ct) = pk
-            .encapsulate(&mut libcrux_rng::OsRng)
+            .encapsulate(&mut os_rng::OsRng)
             .map_err(|_| Error::Kem("encapsulate"))?;
         Ok((SharedSecret(ss.encode()), Ciphertext(ct.encode())))
     }

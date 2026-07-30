@@ -18,7 +18,23 @@ codetalker-core = { path = "../codetalker-core", features = ["pq"] }
 wasm-bindgen = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde-wasm-bindgen = "0.6"
+# Two majors of getrandom, both needed, neither reachable from the other.
+#
+# 0.2 backs `rand_core` 0.6's `OsRng`, which is the single entropy source the
+# core crate funnels everything through (see `kem::os_rng`). On
+# wasm32-unknown-unknown it needs the `js` feature.
+#
+# 0.4 arrives under RustCrypto 0.11: `crypto-common` 0.2 depends on it
+# unconditionally, so aes-gcm, chacha20poly1305 and the dalek crates all drag it
+# in. It refuses to compile for wasm without `wasm_js` and there is no way to ask
+# for that from a transitive position -- hence the aliased direct dependency,
+# which exists purely to turn the feature on. Nothing imports it.
+#
+# Unlike getrandom 0.3, the feature alone is sufficient here; 0.3 additionally
+# required `--cfg getrandom_backend="wasm_js"` in RUSTFLAGS, which wasm-pack has
+# no clean way to set.
 getrandom = { version = "0.2", features = ["js"] }
+getrandom_04 = { package = "getrandom", version = "0.4", features = ["wasm_js"] }
 hex = "0.4"
 
 [profile.release]

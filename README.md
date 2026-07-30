@@ -113,6 +113,15 @@ Note the `--out-dir`. The deploy publishes `web/`, so that is where the module
 has to land; building into the default `codetalker-wasm/pkg` produces a module
 the demo cannot reach. CI uses the same flag for the same reason.
 
+The wasm build carries **two majors of `getrandom`**, and both are load-bearing.
+0.2 backs `rand_core` 0.6's `OsRng`, the single entropy source everything funnels
+through. 0.4 arrives with RustCrypto 0.11 — `crypto-common` 0.2 depends on it
+unconditionally — and refuses to compile for `wasm32-unknown-unknown` without its
+`wasm_js` feature, which cannot be requested from a transitive position. Hence the
+aliased direct dependency in `codetalker-wasm/Cargo.toml` that exists only to
+enable it. If a wasm build ever fails with "the wasm32/64-unknown-unknown are not
+supported by default", that dependency is what went missing.
+
 MSRV is 1.85 with `pq` enabled, because libcrux uses edition 2024. The default
 feature set builds on considerably older toolchains.
 
@@ -228,6 +237,7 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | `cargo fuzz identity_verify` | 577,993 classical + 608,145 with `pq`, no crashes |
 | Actions pinned | every workflow action pinned to a commit SHA, Dependabot moves them |
 | `forbid(unsafe_code)` | enforced by the compiler, not asserted in prose |
+| RustCrypto 0.11 / dalek 3.0 | migrated; every published vector still reproduces byte for byte |
 
 `cargo audit` reports `proc-macro-error2` as unmaintained (RUSTSEC-2026-0173).
 It arrives through `hax-lib-macros` — part of the formal-verification toolchain
@@ -242,7 +252,10 @@ invisible until something actually ran:
 **`--features pq` had never compiled.** `libcrux-kem` takes its RNG through
 `rand_core` 0.10's `CryptoRng`; this crate is on 0.6, and the two traits are
 unrelated. The old note blamed an outdated toolchain, which was wrong — a
-current toolchain fails identically. `kem::libcrux_rng` bridges the two.
+current toolchain fails identically. `kem::os_rng` bridges the two. It was
+`kem::libcrux_rng` until x25519-dalek 3.0 moved to `rand_core` 0.10 as well,
+at which point the classical KEM needed the identical bridge and the name
+stopped describing it.
 
 **The ML-KEM known-answer test verified nothing.** It checked that a file
 existed. Worse, CI fetched ACVP's `prompt.json`, which contains inputs and no

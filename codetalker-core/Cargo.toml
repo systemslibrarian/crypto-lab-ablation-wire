@@ -11,7 +11,10 @@ rust-version = "1.85"
 [features]
 # Classical-only KEM. Compiles everywhere, including older toolchains.
 default = ["classical"]
-classical = ["dep:x25519-dalek", "dep:ed25519-dalek"]
+# `rand_core_010` is not a post-quantum concern any more. x25519-dalek 3.0 takes
+# its randomness through rand_core 0.10's `CryptoRng` too, so the classical KEM
+# needs the same bridge libcrux does. See `kem::os_rng`.
+classical = ["dep:x25519-dalek", "dep:ed25519-dalek", "dep:rand_core_010"]
 # Hybrid X-Wing (X25519 + ML-KEM-768) via libcrux.
 # Requires a recent toolchain; see README for the pinned MSRV.
 pq = ["dep:libcrux-kem", "dep:libcrux-ml-dsa", "dep:rand_core_010"]
@@ -30,16 +33,16 @@ check-secret-independence = [
 ]
 
 [dependencies]
-hkdf = "0.12"
-sha2 = "0.10"
-aes-gcm = "0.10"
-chacha20poly1305 = "0.10"
+hkdf = "0.13"
+sha2 = "0.11"
+aes-gcm = "0.11"
+chacha20poly1305 = "0.11"
 rand_core = { version = "0.6", features = ["getrandom"] }
 subtle = "2.5"
 zeroize = "1.8"
 
-x25519-dalek = { version = "2.0", optional = true, features = ["static_secrets"] }
-ed25519-dalek = { version = "2.1", optional = true }
+x25519-dalek = { version = "3.0", optional = true, features = ["static_secrets"] }
+ed25519-dalek = { version = "3.0", optional = true }
 libcrux-kem = { version = "0.0.9", optional = true }
 libcrux-ml-dsa = { version = "0.0.10", optional = true }
 # Declared only so `check-secret-independence` can reach its feature; see above.
