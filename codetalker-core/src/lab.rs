@@ -86,7 +86,10 @@ impl Setup {
 // instrumentation does not trace; the values they produce are then exercised end
 // to end by every test below. Writing runtime callers to colour the report green
 // would buy a number and no confidence.
-const fn full() -> Setup {
+//
+// `pub(crate)` because `explain` builds its demonstration configurations the same
+// way, and two sets of builders for one type is one set too many.
+pub(crate) const fn full() -> Setup {
     Setup {
         layers: Layers {
             key_agreement: true,
@@ -101,31 +104,31 @@ const fn full() -> Setup {
     }
 }
 
-const fn speaker(mut s: Setup) -> Setup {
+pub(crate) const fn speaker(mut s: Setup) -> Setup {
     s.adversary_knows_transport = true;
     s
 }
-const fn no_key_agreement(mut s: Setup) -> Setup {
+pub(crate) const fn no_key_agreement(mut s: Setup) -> Setup {
     s.layers.key_agreement = false;
     s
 }
-const fn no_aead(mut s: Setup) -> Setup {
+pub(crate) const fn no_aead(mut s: Setup) -> Setup {
     s.layers.aead = false;
     s
 }
-const fn no_auth(mut s: Setup) -> Setup {
+pub(crate) const fn no_auth(mut s: Setup) -> Setup {
     s.layers.authenticate = false;
     s
 }
-const fn no_ratchet(mut s: Setup) -> Setup {
+pub(crate) const fn no_ratchet(mut s: Setup) -> Setup {
     s.layers.ratchet = false;
     s
 }
-const fn repeat_nonce(mut s: Setup) -> Setup {
+pub(crate) const fn repeat_nonce(mut s: Setup) -> Setup {
     s.layers.nonce_reuse = true;
     s
 }
-const fn pre_quantum(mut s: Setup) -> Setup {
+pub(crate) const fn pre_quantum(mut s: Setup) -> Setup {
     s.kem = Some("x25519");
     s
 }

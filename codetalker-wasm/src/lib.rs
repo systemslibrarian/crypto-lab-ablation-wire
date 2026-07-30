@@ -10,7 +10,7 @@
 
 use codetalker_core::session::{self, Recovery};
 use codetalker_core::threat;
-use codetalker_core::{aead, kem, lab, transport};
+use codetalker_core::{aead, explain as core_explain, kem, lab, transport};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -455,6 +455,106 @@ pub fn lab() -> Result<JsValue, JsValue> {
             })
             .collect(),
         switches: lab::SWITCHES.iter().map(|s| s.to_string()).collect(),
+    };
+    serde_wasm_bindgen::to_value(&out).map_err(js)
+}
+
+/* ----------------------------------------------------------------- explain */
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PanelView {
+    pub id: String,
+    pub job: String,
+    pub adversary: String,
+    pub consequence: String,
+    pub demo: SetupView,
+    pub demo_verdict: String,
+    pub historical: String,
+    pub modern: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct TermView {
+    pub term: String,
+    pub definition: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FieldView {
+    pub kind: String,
+    pub purpose: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BeatView {
+    pub from: String,
+    pub to: String,
+    pub message: String,
+    pub note: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Explain {
+    pub panels: Vec<PanelView>,
+    pub glossary: Vec<TermView>,
+    pub fields: Vec<FieldView>,
+    /// Both handshake shapes. The page picks by `Transmission::authenticated`
+    /// rather than by its own reading of the switches, so the picture and the
+    /// protocol that ran cannot disagree.
+    pub sequence_authenticated: Vec<BeatView>,
+    pub sequence_unauthenticated: Vec<BeatView>,
+}
+
+fn beats(authenticated: bool) -> Vec<BeatView> {
+    core_explain::sequence(authenticated)
+        .iter()
+        .map(|b| BeatView {
+            from: b.from.to_string(),
+            to: b.to.to_string(),
+            message: b.message.to_string(),
+            note: b.note.to_string(),
+        })
+        .collect()
+}
+
+/// The captions: what each layer is for, what its absence does, the glossary,
+/// the wire-field purposes and both handshake shapes.
+///
+/// Same rule as [`lab`]: every panel carries the configuration that
+/// demonstrates it and the verdict that configuration produces, and
+/// `tests/ablation.rs` runs them. An explanation is a claim about the channel
+/// and gets held to the channel.
+#[wasm_bindgen]
+pub fn explain() -> Result<JsValue, JsValue> {
+    let out = Explain {
+        panels: core_explain::PANELS
+            .iter()
+            .map(|p| PanelView {
+                id: p.id.to_string(),
+                job: p.job.to_string(),
+                adversary: p.adversary.to_string(),
+                consequence: p.consequence.to_string(),
+                demo: setup_view(&p.demo),
+                demo_verdict: p.demo_verdict.to_string(),
+                historical: p.historical.to_string(),
+                modern: p.modern.to_string(),
+            })
+            .collect(),
+        glossary: core_explain::GLOSSARY
+            .iter()
+            .map(|t| TermView { term: t.term.to_string(), definition: t.definition.to_string() })
+            .collect(),
+        fields: core_explain::FIELDS
+            .iter()
+            .map(|f| FieldView { kind: f.kind.to_string(), purpose: f.purpose.to_string() })
+            .collect(),
+        sequence_authenticated: beats(true),
+        sequence_unauthenticated: beats(false),
     };
     serde_wasm_bindgen::to_value(&out).map_err(js)
 }

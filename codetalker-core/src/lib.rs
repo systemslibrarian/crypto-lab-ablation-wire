@@ -45,6 +45,7 @@
 
 pub mod aead;
 pub mod error;
+pub mod explain;
 pub mod handshake;
 pub mod identity;
 pub mod kdf;

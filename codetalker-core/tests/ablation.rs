@@ -860,3 +860,178 @@ fn the_ratchet_step_keeps_the_nonce_fault_the_pad_step_injected() {
     );
     assert!(ratchet.after.layers.ratchet);
 }
+
+// ---------------------------------------------------------------------------
+// The captions. An explanation that describes a failure the channel does not
+// have is the worst thing to ship in a teaching demo, because it is the part a
+// reader cannot check for themselves.
+// ---------------------------------------------------------------------------
+
+use codetalker_core::explain;
+
+#[test]
+fn every_layer_caption_demonstrates_the_consequence_it_describes() {
+    for p in explain::PANELS {
+        assert_eq!(
+            outcome(p.demo),
+            p.demo_verdict,
+            "{}: the caption's demonstration does not do what the caption says",
+            p.id
+        );
+    }
+}
+
+#[test]
+fn every_console_switch_has_a_caption_and_every_caption_a_switch() {
+    // The Kieyoomia control is an adversary capability rather than a layer and
+    // keeps its own standing explanation on the page, so it is not in PANELS.
+    let switches: Vec<&str> = lab::SWITCHES
+        .iter()
+        .copied()
+        .filter(|s| *s != "adversaryKnowsTransport")
+        .collect();
+    for s in &switches {
+        assert!(
+            explain::PANELS.iter().any(|p| p.id == *s),
+            "the console has a switch {s} that nothing explains"
+        );
+    }
+    for p in explain::PANELS {
+        assert!(
+            switches.contains(&p.id),
+            "{} is explained and is not a switch on the console",
+            p.id
+        );
+    }
+}
+
+/// The two layers whose absence the recovery verdict cannot show. Stating this
+/// as a test rather than only in prose, because it is the claim most likely to
+/// be quietly contradicted by a change to the scoring: if switching either of
+/// these off ever started moving the verdict, their captions would be wrong and
+/// the demo would be teaching that every layer announces itself.
+#[test]
+fn transport_and_ratchet_change_no_verdict_and_the_captions_say_so() {
+    let baseline = outcome(lab::SCENARIOS[1].setup); // the Kieyoomia preset
+    assert_eq!(baseline, "MetadataOnly");
+    for id in ["transport", "ratchet"] {
+        let p = explain::PANELS.iter().find(|p| p.id == id).unwrap();
+        assert_eq!(
+            p.demo_verdict, baseline,
+            "{id}: this layer's absence must not move the recovery verdict"
+        );
+    }
+}
+
+/// ...and the reason to keep them is in the threat matrix instead, which is
+/// exactly where their captions point.
+#[test]
+fn the_ratchet_earns_its_place_in_the_matrix_rather_than_the_verdict() {
+    let with = threat::assess(Layers::default(), true);
+    let without = threat::assess(Layers { ratchet: false, ..Layers::default() }, true);
+    assert_eq!(with[2].status, Status::Defended);
+    assert_eq!(without[2].status, Status::Exposed, "A3 is the ratchet's row");
+    for i in [0, 1, 3] {
+        assert_eq!(
+            with[i].status, without[i].status,
+            "the ratchet must move A3 and nothing else"
+        );
+    }
+}
+
+#[test]
+fn every_caption_answers_the_whole_schema() {
+    for p in explain::PANELS {
+        for (field, text) in [
+            ("job", p.job),
+            ("consequence", p.consequence),
+            ("historical", p.historical),
+            ("modern", p.modern),
+        ] {
+            assert!(
+                text.len() > 60,
+                "{}: {field} is too short to be an explanation",
+                p.id
+            );
+        }
+        // `adversary` is a label rather than prose -- it sits beside the panel
+        // heading -- so it gets a label's floor.
+        assert!(p.adversary.len() > 20, "{}: no adversary named", p.id);
+        // "Which adversary" is the question the threat matrix exists to answer,
+        // and a caption that does not answer it is describing a mechanism rather
+        // than a defence -- except for the transport layer, whose honest answer
+        // is that it defends against nobody.
+        assert!(
+            p.adversary.starts_with('A') || p.id == "transport",
+            "{}: {:?} names no adversary",
+            p.id,
+            p.adversary
+        );
+    }
+}
+
+/// The ratchet caption is the one most likely to overclaim, so it is the one
+/// pinned hardest. It must deny post-compromise security and must not be
+/// mistaken for Signal's Double Ratchet.
+#[test]
+fn the_ratchet_caption_refuses_the_two_claims_it_does_not_support() {
+    let p = explain::PANELS.iter().find(|p| p.id == "ratchet").unwrap();
+    let all = format!("{} {} {}", p.job, p.consequence, p.modern);
+    assert!(
+        all.contains("not the Signal Double Ratchet") || all.contains("only that half"),
+        "the caption must distinguish this from a Double Ratchet"
+    );
+    assert!(
+        all.contains("does not give post-compromise security"),
+        "the caption must deny post-compromise security in as many words"
+    );
+}
+
+#[test]
+fn every_wire_field_the_console_labels_has_a_purpose() {
+    for kind in ["framing", "length", "ciphertext", "tag", "plaintext", "padding"] {
+        let f = explain::FIELDS
+            .iter()
+            .find(|f| f.kind == kind)
+            .unwrap_or_else(|| panic!("the hexdump labels {kind} and nothing explains it"));
+        assert!(f.purpose.len() > 60, "{kind}: no real explanation");
+    }
+}
+
+#[test]
+fn the_glossary_defines_each_term_once_and_in_one_sentence() {
+    for t in explain::GLOSSARY {
+        assert!(!t.term.is_empty() && t.definition.len() > 40, "{}", t.term);
+        assert_eq!(
+            explain::GLOSSARY.iter().filter(|x| x.term == t.term).count(),
+            1,
+            "{} is defined twice",
+            t.term
+        );
+    }
+}
+
+/// The two handshake pictures have to be different pictures. Drawing the
+/// authenticated shape while `establish_mitm` is what ran would hide the only
+/// thing the unauthenticated configuration has to teach.
+#[test]
+fn the_unauthenticated_handshake_names_the_attacker_as_the_peer() {
+    let good = explain::sequence(true);
+    let bad = explain::sequence(false);
+    assert_ne!(good[0].from, bad[0].from);
+    assert!(
+        bad.iter().any(|b| b.from == "Attacker" || b.to == "Attacker"),
+        "the attacker must appear in the diagram, not be implied by it"
+    );
+    assert!(
+        good.iter().all(|b| b.from != "Attacker" && b.to != "Attacker"),
+        "a pinned peer leaves no attacker in the picture"
+    );
+    assert!(
+        good.iter().any(|b| b.message.contains("pinned")),
+        "the authenticated shape turns on the pin, so the pin must be drawn"
+    );
+    for b in good.iter().chain(bad.iter()) {
+        assert!(!b.message.is_empty() && b.note.len() > 20);
+    }
+}

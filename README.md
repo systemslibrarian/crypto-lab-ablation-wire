@@ -60,6 +60,39 @@ Any configuration is a link: the address bar carries the switches, the backend,
 the AEAD suite, both messages and — in guided mode — the experiment and whether
 its result is showing, so `#m=g&s=3&st=r` opens experiment 3 at its debrief.
 
+## Concepts at the point of use
+
+Every switch carries a caption on one schema — what the layer's **job** is, which
+**adversary** it answers, what its absence concretely **means**, the **1942**
+analogue *and where that analogue stops*, and the **modern** protocol comparison.
+Each one ends in a "show me" button that puts the console into the configuration
+that demonstrates it.
+
+That button is why the captions live in `explain.rs` and not in the page. A
+caption declares the verdict its demonstration produces, and `tests/ablation.rs`
+runs it. Two of those assertions are the ones worth having: the transport and
+ratchet captions both claim their layer's absence moves *no* verdict, and a test
+holds them to it — if either ever started changing the recovery, the captions
+would be wrong and the demo would be teaching that every layer announces itself.
+The ratchet caption is pinned harder still, because it is the one most likely to
+overclaim: a test requires it to deny post-compromise security in as many words
+and to distinguish itself from Signal's Double Ratchet.
+
+The layers are deliberately **not** presented as a ladder. Transport
+obfuscation, confidentiality, authentication, forward secrecy and post-quantum
+resistance are not interchangeable quantities with one of them strongest, and a
+reader who leaves believing they are ranked has learned something false from a
+demo that switches them on and off in a single column.
+
+Alongside them: a twelve-term glossary, reachable inline on hover *or keyboard
+focus* — `:focus` and not `:focus-visible`, so a touch tap works too; a hexdump
+legend where focusing a key isolates that field's bytes and says what the field
+is for; and the handshake drawn as the sequence that actually ran, which redraws
+the far end as the attacker when peer authentication is off. The transcript hash,
+root key and per-frame message keys are still there, collapsed behind "inspect
+internals" — they are evidence worth keeping and 64 hex characters apiece
+competing with the lesson for a novice's attention.
+
 ## The handshake is real
 
 `handshake` runs two parties exchanging two messages. Neither function generates
@@ -99,6 +132,7 @@ codetalker-core/
   src/session.rs     the ablation harness
   src/threat.rs      which adversary each configuration survives, with reasons
   src/lab.rs         the guided sequence and the presets, as data
+  src/explain.rs     the captions: what each layer is for, and the glossary
   tests/kat.rs       published known-answer vectors
   tests/ablation.rs  one test per claim the demo makes in prose
   tests/properties.rs proptest coverage of the untrusted parser
@@ -260,9 +294,9 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 
 | | status |
 |---|---|
-| `default` (classical) | clean build, 0 warnings, **65/65 tests passing** |
-| `--no-default-features --features pq` | **64/64** — the pure post-quantum build |
-| `--no-default-features --features classical,pq` | **67/67**, both suites present |
+| `default` (classical) | clean build, 0 warnings, **74/74 tests passing** |
+| `--no-default-features --features pq` | **73/73** — the pure post-quantum build |
+| `--no-default-features --features classical,pq` | **76/76**, both suites present |
 | MSRV, rustc 1.85 | builds `classical,pq` clean |
 | FIPS 203 vectors | 35 ML-KEM-768 decapsulation vectors verified |
 | FIPS 204 vectors | ML-DSA-65 signature verification, valid and invalid cases |
@@ -273,15 +307,16 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | `wasm-pack build` | 700 KB module, driven end to end across every ablation |
 | Threat matrix | A1–A5 computed in `threat.rs`; every row of THREAT_MODEL.md asserted in `tests/ablation.rs` |
 | Guided lab | 5 experiments and 7 presets in `lab.rs`; every declared outcome run through the real channel in `tests/ablation.rs` |
-| Guided lab, in a browser | **47 checks driven headlessly** — the full five-experiment run, prediction scoring, link restore, every preset, and reset |
+| Layer captions | 6 panels in `explain.rs`, each carrying the configuration that demonstrates it; every "show me" asserted to produce the verdict its caption claims |
+| Console, in a browser | **63 checks driven headlessly** — the full five-experiment run, prediction scoring, link restore, every preset, reset, every caption's "show me", the glossary, both handshake pictures, and the hexdump keys |
 | Deployed demo | **384 configurations driven on the published artifact** — every backend × both suites × all 64 layer combinations, none throwing, no console errors |
 | `check-artifact.sh` | every relative reference resolves inside `web/` |
 | `cargo fuzz deobfuscate` | 45,027,157 executions, no crashes |
 | `cargo fuzz identity_verify` | 577,993 classical + 608,145 with `pq`, no crashes |
 | Scheduled fuzzing | nightly, 20 min per target, against a corpus cached between runs — demonstrated: the second run restored 169 seeds and libFuzzer reported them |
-| Line coverage | **81.19%** (81.06% region, 74.00% function), floored at 80% in CI |
+| Line coverage | **81.84%** (81.01% region, 72.82% function), floored at 80% in CI |
 | Build provenance | the published wasm module is signed; `gh attestation verify` checks it |
-| Module size | 724 kB, budgeted at 900 kB by `check-artifact.sh` |
+| Module size | 740 kB, budgeted at 900 kB by `check-artifact.sh` |
 | Actions pinned | every workflow action pinned to a commit SHA, Dependabot moves them |
 | `forbid(unsafe_code)` | enforced by the compiler, not asserted in prose |
 | RustCrypto 0.11 / dalek 3.0 | migrated; every published vector still reproduces byte for byte |

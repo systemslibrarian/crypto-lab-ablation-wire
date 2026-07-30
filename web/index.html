@@ -559,6 +559,105 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
   .flash { outline: 2px solid var(--accent); outline-offset: 2px; }
 }
 
+/* ---------------------------------------------------------- layer captions */
+
+.switch-row + .switch-row { margin-top: 0.1rem; }
+.why-toggle {
+  font: inherit; font-size: var(--fs-xs); cursor: pointer;
+  background: none; border: 0; padding: 0.15rem 0.5rem 0.35rem 3.35rem;
+  color: var(--accent-ink); text-align: left;
+}
+.why-toggle::before { content: "▸ "; }
+.why-toggle[aria-expanded="true"]::before { content: "▾ "; }
+.why-panel {
+  margin: 0 -0.5rem 0.5rem; padding: 0.6rem 0.7rem;
+  border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  border-radius: 4px; background: var(--panel-2);
+}
+.why-row { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr); gap: 0.5rem; }
+.why-row + .why-row { margin-top: 0.45rem; }
+.why-row dt {
+  font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.07em;
+  color: var(--ink-3); font-weight: 600;
+}
+.why-row dd { margin: 0; font-size: var(--fs-xs); color: var(--ink-2); }
+.why-demo { margin-top: 0.6rem; font-size: var(--fs-xs); padding: 0.25rem 0.6rem; }
+
+/* ---------------------------------------------------------------- glossary */
+
+/* Focus as well as hover, and a real button rather than a styled span: a
+   definition only a mouse can reach is a definition half the readers do not
+   have. Touch works because tapping the button focuses it. */
+.term-wrap { position: relative; display: inline-block; }
+button.term {
+  font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: help;
+  border-bottom: 1px dotted var(--accent);
+}
+.term-def {
+  position: absolute; z-index: 40; left: 0; top: calc(100% + 0.3rem);
+  width: max-content; max-width: min(34ch, 78vw);
+  padding: 0.5rem 0.6rem; border: 1px solid var(--accent); border-radius: 4px;
+  background: var(--panel); box-shadow: var(--shadow);
+  font-size: var(--fs-xs); font-weight: 400; color: var(--ink-2);
+  font-family: var(--sans); text-transform: none; letter-spacing: normal;
+  display: none;
+}
+/* `:focus`, not `:focus-visible`. A tap on a touch device focuses the button
+   without satisfying the focus-visible heuristic, so the stricter selector would
+   leave the definition reachable by mouse and keyboard and not by touch —
+   exactly the hover-only failure this markup exists to avoid. */
+.term-wrap:hover .term-def, button.term:focus + .term-def { display: block; }
+
+.glossary dl { display: grid; grid-template-columns: minmax(0, 14rem) minmax(0, 1fr); gap: 0.3rem 1rem; }
+@media (max-width: 620px) { .glossary dl { grid-template-columns: minmax(0, 1fr); gap: 0.1rem; } }
+.glossary dt { font-weight: 600; font-size: var(--fs-sm); }
+.glossary dd { margin: 0; font-size: var(--fs-sm); color: var(--ink-2); }
+.glossary dd { padding-bottom: 0.45rem; }
+
+/* ----------------------------------------------------------- handshake seq */
+
+/* The shape of the handshake that actually ran. With authentication off the
+   party at the far end is the attacker, and drawing "Responder" there would be
+   the one picture that hides the whole lesson. */
+.seq { display: flex; flex-direction: column; gap: 0.35rem; margin-bottom: 1rem; }
+.seq-beat {
+  display: grid; grid-template-columns: 9.5rem minmax(0, 1fr); gap: 0.75rem;
+  padding: 0.45rem 0.6rem; border-radius: 4px;
+  border: 1px solid var(--line-soft); background: var(--panel-2);
+}
+.seq-who { font-family: var(--mono); font-size: var(--fs-xs); color: var(--ink-3); }
+/* Both are spans inside one grid cell, so they need to be blocks: left inline
+   the note runs straight on from the message and the two read as one string. */
+.seq-msg { display: block; font-family: var(--mono); font-size: var(--fs-xs); color: var(--ink); word-break: break-word; }
+.seq-note { display: block; font-size: var(--fs-xs); color: var(--ink-3); margin-top: 0.15rem; }
+.seq.mitm .seq-beat { border-color: var(--bad); background: var(--bad-wash); }
+.seq.mitm .seq-who { color: var(--bad); }
+@media (max-width: 620px) { .seq-beat { grid-template-columns: minmax(0, 1fr); gap: 0.15rem; } }
+
+details.internals { margin-top: 0.9rem; border-top: 1px solid var(--line-soft); padding-top: 0.6rem; }
+details.internals > summary {
+  cursor: pointer; font-size: var(--fs-xs); color: var(--ink-3);
+  font-family: var(--mono); list-style-position: outside;
+}
+details.internals > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+details.internals .facts { margin-top: 0.6rem; }
+
+/* ------------------------------------------------------------ hexdump keys */
+
+.legend button {
+  font: inherit; font-size: inherit; color: inherit; cursor: pointer;
+  background: none; border: 1px solid transparent; border-radius: 3px;
+  padding: 0.1rem 0.3rem; display: inline-flex; align-items: center; gap: 0.35rem;
+}
+.legend button:hover, .legend button:focus-visible { border-color: var(--accent); }
+/* Dim the bytes this key does not name, rather than colouring the ones it does:
+   the colours are already the legend's job and doubling them explains nothing. */
+.hexdump.focusing .bytes span:not(.lit) { opacity: 0.22; }
+.field-purpose {
+  margin-top: 0.5rem; font-size: var(--fs-xs); color: var(--ink-2);
+  min-height: 1.2rem; max-width: 74ch;
+}
+
 /* Visually hidden but available to assistive tech. */
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -817,7 +916,7 @@ python3 -m http.server -d web 8080</pre>
         <div class="field">
           <label for="msg2">Message 2</label>
           <input type="text" id="msg2" value="Enemy armour massing north of the ridge line tonight." />
-          <span class="hint">Sent on the same channel. The ratchet and the two-time pad are both claims about consecutive messages, so one is not enough to show either.</span>
+          <span class="hint">Sent on the same channel. The <span class="term-wrap"><button type="button" class="term" data-term="ratchet">ratchet</button><span class="term-def"></span></span> and the two-time pad are both claims about consecutive messages, so one is not enough to show either.</span>
         </div>
         <div class="field">
           <label for="backend">Key encapsulation</label>
@@ -886,7 +985,9 @@ python3 -m http.server -d web 8080</pre>
       <div class="body">
         <p class="hint" style="margin:0 0 0.75rem">
           &ldquo;Channel holding&rdquo; is never universal. It holds against a named
-          adversary, for a named asset. Definitions are in
+          adversary, for a named asset &mdash; A4 is a
+          <span class="term-wrap"><button type="button" class="term" data-term="harvest-now-decrypt-later">harvest-now-decrypt-later</button><span class="term-def"></span></span> adversary and needs no access today.
+          Definitions are in
           <a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire/blob/main/THREAT_MODEL.md">THREAT_MODEL.md</a>.
         </p>
         <div id="threat-rows"></div>
@@ -899,6 +1000,10 @@ python3 -m http.server -d web 8080</pre>
         <span class="note">true in every configuration above</span>
       </header>
       <div class="body">
+        <p class="hint" style="margin:0 0 0.75rem">
+          <span class="term-wrap"><button type="button" class="term" data-term="metadata">metadata</button><span class="term-def"></span></span> is what stays true about a message when its contents do
+          not. No switch on this page moves any of it.
+        </p>
         <div id="leak-rows"></div>
       </div>
     </section>
@@ -911,7 +1016,7 @@ python3 -m http.server -d web 8080</pre>
       <div class="body">
         <p class="verdict-detail" style="margin-bottom:0.85rem">
           Both frames were sealed under one key and one nonce, so
-          <span class="mono">C₁ ⊕ C₂ = P₁ ⊕ P₂</span>. Taking message 1 as a known crib
+          <span class="mono">C₁ ⊕ C₂ = P₁ ⊕ P₂</span>. Taking message 1 as a known <span class="term-wrap"><button type="button" class="term" data-term="crib">crib</button><span class="term-def"></span></span>
           cancels the keystream and leaves message 2.
         </p>
         <div class="pad-cols">
@@ -940,6 +1045,10 @@ python3 -m http.server -d web 8080</pre>
         <div class="wire-meta" id="wire-meta"></div>
         <div class="hexdump" id="hexdump"></div>
         <div class="legend" id="legend"></div>
+        <!-- Focus or hover a key to isolate its bytes and read what the field is
+             for. The colours say which run is which; they never said why any of
+             them is there. -->
+        <p class="field-purpose" id="field-purpose"></p>
         <!-- The ratchet lesson is a comparison between two frames, and asking a
              reader to diff two 64-character hex strings by eye is asking them not
              to check. codetalker-core reports the comparison; this renders it. -->
@@ -961,9 +1070,34 @@ python3 -m http.server -d web 8080</pre>
     </section>
 
     <section class="card">
-      <header><h2>Handshake</h2></header>
+      <header><h2>Handshake</h2><span class="note" id="seq-note"></span></header>
       <div class="body">
+        <p class="hint" style="margin:0 0 0.75rem">
+          Both sides hash every handshake message into a <span class="term-wrap"><button type="button" class="term" data-term="transcript">transcript</button><span class="term-def"></span></span>, which is
+          signed and then bound into every frame as <span class="term-wrap"><button type="button" class="term" data-term="associated data">associated data</button><span class="term-def"></span></span>.
+          Verifying that signature against a key known in advance is
+          <span class="term-wrap"><button type="button" class="term" data-term="pinning">pinning</button><span class="term-def"></span></span>.
+        </p>
+        <div class="seq" id="seq"></div>
         <table class="facts"><tbody id="facts"></tbody></table>
+        <!-- The root key and the transcript hash are the evidence that the two
+             sides really agreed, and they are also 64 hex characters each
+             competing with the lesson for a novice's attention. Kept, collapsed. -->
+        <details class="internals">
+          <summary>Inspect internals — transcript hash, root key, per-frame message keys</summary>
+          <table class="facts"><tbody id="facts-internal"></tbody></table>
+        </details>
+      </div>
+    </section>
+
+    <section class="card glossary">
+      <header><h2>Terms</h2><span class="note">one sentence each</span></header>
+      <div class="body">
+        <p class="hint" style="margin:0 0 0.75rem">
+          Dotted terms elsewhere on the page open the same definition on hover or
+          keyboard focus.
+        </p>
+        <dl id="glossary-list"></dl>
       </div>
     </section>
 
@@ -1038,6 +1172,10 @@ let activeFrame = 0;
    options and the switch ids they name — all of it data the crate ships and
    tests/ablation.rs asserts against the real channel. */
 let LAB = null;
+/* The captions, from `codetalker_core::explain`. Same rule as the curriculum:
+   every layer panel carries the configuration that demonstrates it and the
+   verdict that configuration produces, and the crate's tests run them. */
+let EXPLAIN = null;
 let mode = "guided";
 let stepIndex = 0;
 let stage = "predict";
@@ -1064,9 +1202,11 @@ async function boot() {
   }
   $("console").hidden = false;
   LAB = wasm.lab();
+  EXPLAIN = wasm.explain();
   buildBadges();
   buildControls();
   buildLab();
+  buildGlossary();
 
   // A link is a configuration. Restoring it must beat the default first-run
   // experience, or an instructor's link lands the class on experiment one.
@@ -1155,7 +1295,98 @@ function switchEl({ key, name, sub, impl, fault }) {
     // Not the switch itself, though — the reader just touched it and knows.
     run({ flashChanges: true });
   });
-  return label;
+
+  // The switch is a <label>, so the caption cannot live inside it: a button
+  // there would toggle the checkbox on its way to opening a panel.
+  const row = document.createElement("div");
+  row.className = "switch-row";
+  row.appendChild(label);
+  const panel = EXPLAIN.panels.find((p) => p.id === key);
+  if (panel) row.appendChild(captionEl(panel, name));
+  return row;
+}
+
+/* What a layer is for, which adversary it answers, and what its absence
+   concretely does — with a button that puts the console into the configuration
+   that shows it. The crate asserts that configuration produces the verdict the
+   caption claims, so "show me" is not a figure of speech. */
+function captionEl(panel, name) {
+  const wrap = document.createDocumentFragment();
+  const id = `why-${panel.id}`;
+
+  const toggle = document.createElement("button");
+  toggle.type = "button";
+  toggle.className = "why-toggle";
+  toggle.setAttribute("aria-expanded", "false");
+  toggle.setAttribute("aria-controls", id);
+  toggle.textContent = `What ${name.toLowerCase()} is for`;
+
+  const box = document.createElement("dl");
+  box.className = "why-panel";
+  box.id = id;
+  box.hidden = true;
+
+  const rows = [
+    ["Job", panel.job],
+    ["Adversary", panel.adversary],
+    [panel.id === "nonceReuse" ? "On means" : "Off means", panel.consequence],
+    ["1942", panel.historical],
+    ["Modern", panel.modern],
+  ];
+  for (const [k, v] of rows) {
+    const row = document.createElement("div");
+    row.className = "why-row";
+    row.innerHTML = `<dt></dt><dd></dd>`;
+    row.querySelector("dt").textContent = k;
+    row.querySelector("dd").textContent = v;
+    box.appendChild(row);
+  }
+
+  const demo = document.createElement("button");
+  demo.type = "button";
+  demo.className = "ghost why-demo";
+  demo.textContent = "Show me";
+  demo.addEventListener("click", () => {
+    setMode("explore");
+    applySetup(panel.demo);
+    run({ flashChanges: true, moved: [panel.id] });
+  });
+  box.appendChild(demo);
+
+  toggle.addEventListener("click", () => {
+    const open = toggle.getAttribute("aria-expanded") === "true";
+    toggle.setAttribute("aria-expanded", String(!open));
+    box.hidden = open;
+  });
+
+  wrap.append(toggle, box);
+  return wrap;
+}
+
+/* The glossary, and the dotted terms scattered through the page that open the
+   same definition. Focus as well as hover, per the CSS — a definition only a
+   mouse can reach is one that half the readers do not have. */
+function buildGlossary() {
+  const list = $("glossary-list");
+  for (const t of EXPLAIN.glossary) {
+    const dt = document.createElement("dt");
+    dt.textContent = t.term;
+    const dd = document.createElement("dd");
+    dd.textContent = t.definition;
+    list.append(dt, dd);
+  }
+
+  const byTerm = new Map(EXPLAIN.glossary.map((t) => [t.term, t.definition]));
+  document.querySelectorAll("button.term").forEach((btn, i) => {
+    const def = byTerm.get(btn.dataset.term);
+    // Same drift alarm as the switch ids: a term renamed in the crate must not
+    // leave a dotted underline on the page that explains nothing.
+    if (!def) { console.error(`the page marks up "${btn.dataset.term}", which the glossary does not define`); return; }
+    const box = btn.nextElementSibling;
+    box.id = `gloss-${i}`;
+    box.textContent = def;
+    btn.setAttribute("aria-describedby", box.id);
+  });
 }
 
 function buildControls() {
@@ -1596,6 +1827,7 @@ function run({ flashChanges = false, moved = null } = {}) {
   renderKeyCompare(result);
   renderWire(result);
   renderReceiver(result);
+  renderSequence(result);
   renderFacts(result, cfg);
   markPreset();
   writeHash();
@@ -1795,14 +2027,35 @@ function renderWire(r) {
     dump.appendChild(line);
   }
 
+  // Each key isolates its own bytes and says what the field is for. The colours
+  // already said which run is which; they never said why any of them is there.
   const kinds = [...new Set(frame.segments.map((s) => s.kind))];
   $("legend").innerHTML = "";
+  $("field-purpose").textContent = "";
   for (const kind of kinds) {
-    const s = document.createElement("span");
-    s.innerHTML = `<i class="b-${kind}"></i>`;
-    s.appendChild(document.createTextNode(KIND_LABELS[kind] ?? kind));
-    $("legend").appendChild(s);
+    const b = document.createElement("button");
+    b.type = "button";
+    b.dataset.kind = kind;
+    b.innerHTML = `<i class="b-${kind}"></i>`;
+    b.appendChild(document.createTextNode(KIND_LABELS[kind] ?? kind));
+    for (const on of ["mouseenter", "focus"]) b.addEventListener(on, () => focusField(kind));
+    for (const off of ["mouseleave", "blur"]) b.addEventListener(off, () => focusField(null));
+    $("legend").appendChild(b);
   }
+}
+
+function focusField(kind) {
+  const dump = $("hexdump");
+  dump.classList.toggle("focusing", kind !== null);
+  for (const el of dump.querySelectorAll(".bytes span")) {
+    el.classList.toggle("lit", kind !== null && el.classList.contains("b-" + kind));
+  }
+  if (kind === null) { $("field-purpose").textContent = ""; return; }
+  const field = EXPLAIN.fields.find((f) => f.kind === kind);
+  // Drift alarm, as elsewhere: a run of bytes the dump colours and nothing
+  // explains is a label pretending to be an explanation.
+  if (!field) { console.error(`the hexdump labels "${kind}", which nothing explains`); return; }
+  $("field-purpose").textContent = field.purpose;
 }
 
 function renderReceiver(r) {
@@ -1814,6 +2067,34 @@ function renderReceiver(r) {
     ? "Decrypted by the pinned peer, through the ordinary receive path."
     : "With authentication off, the party that decrypted this is the attacker. "
       + "Delivery succeeding is not evidence that it reached the intended peer.";
+}
+
+/* The handshake that actually ran. Two shapes, and the difference is the whole
+   authentication lesson — with no pinned key the party at the far end is the
+   attacker, so drawing "Responder" there would be the one picture that hides
+   what the configuration has to teach. The page picks by `r.authenticated`,
+   which is what the crate reports, not by re-reading the switches. */
+function renderSequence(r) {
+  const beats = r.authenticated
+    ? EXPLAIN.sequenceAuthenticated
+    : EXPLAIN.sequenceUnauthenticated;
+  const box = $("seq");
+  box.className = "seq" + (r.authenticated ? "" : " mitm");
+  box.innerHTML = "";
+  for (const b of beats) {
+    const el = document.createElement("div");
+    el.className = "seq-beat";
+    el.innerHTML =
+      `<span class="seq-who"></span>` +
+      `<span><span class="seq-msg"></span><span class="seq-note"></span></span>`;
+    el.querySelector(".seq-who").textContent = b.to ? `${b.from} → ${b.to}` : b.from;
+    el.querySelector(".seq-msg").textContent = b.message;
+    el.querySelector(".seq-note").textContent = b.note;
+    box.appendChild(el);
+  }
+  $("seq-note").textContent = r.authenticated
+    ? "responder-authenticated, initiator-anonymous"
+    : "no pinned key — the peer is the attacker";
 }
 
 function renderFacts(r, cfg) {
@@ -1829,23 +2110,31 @@ function renderFacts(r, cfg) {
         : "neither half"],
     ["AEAD suite", r.suite],
     ["Peer authenticated", r.authenticated ? "yes, pinned identity" : "no — any signer accepted"],
+  ].filter(Boolean);
+
+  // Kept, and collapsed. These four are the evidence that the two sides really
+  // agreed on a secret, which is worth having; they are also 64 hex characters
+  // apiece competing with the lesson for a novice's attention.
+  const internal = [
     ["Transcript hash", r.transcriptHash],
     ["Session root key", r.rootKey],
     ["Frame 1 message key", r.frames[0].messageKey],
     ["Frame 2 message key", r.frames[1].messageKey
       + (r.frames[0].messageKey === r.frames[1].messageKey ? "  · identical, no ratchet" : "")],
-  ].filter(Boolean);
+  ];
 
-  const body = $("facts");
-  body.innerHTML = "";
-  for (const [k, v] of rows) {
-    const tr = document.createElement("tr");
-    const th = document.createElement("th");
-    th.textContent = k;
-    const td = document.createElement("td");
-    td.textContent = v;
-    tr.append(th, td);
-    body.appendChild(tr);
+  for (const [id, set] of [["facts", rows], ["facts-internal", internal]]) {
+    const body = $(id);
+    body.innerHTML = "";
+    for (const [k, v] of set) {
+      const tr = document.createElement("tr");
+      const th = document.createElement("th");
+      th.textContent = k;
+      const td = document.createElement("td");
+      td.textContent = v;
+      tr.append(th, td);
+      body.appendChild(tr);
+    }
   }
 
   $("backend-hint").textContent = substituted
