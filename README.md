@@ -160,6 +160,7 @@ TEACHING.md          instructor guide, student worksheet, answer key
   tests/ablation.rs  one test per claim the demo makes in prose
   tests/properties.rs proptest coverage of the untrusted parser
 fuzz/                cargo-fuzz targets: transport::deobfuscate, identity::verify
+.github/checks/      the page driven in a real browser, in CI: console.mjs, a11y.mjs
 codetalker-wasm/     wasm-bindgen surface
 web/index.html       the ablation console
 web/pkg/             wasm-pack output, generated, not committed
@@ -202,6 +203,8 @@ cargo +nightly fuzz run deobfuscate          # the framing parser
 cargo +nightly fuzz run identity_verify --features pq   # the signature verifier
 wasm-pack build codetalker-wasm --target web --release --out-dir ../web/pkg
 .github/check-artifact.sh                    # the Pages artifact resolves
+node .github/checks/console.mjs              # drive the page in headless Chrome
+node .github/checks/a11y.mjs                 # contrast, keyboard, zoom, screen reader
 cargo llvm-cov -p codetalker-core --no-default-features --features classical,pq \
   --summary-only                             # coverage; CI floors this at 80%
 ```
@@ -311,6 +314,27 @@ attacker was handed would be the simulation this crate exists to avoid.
 **A valid signature is not an identity.** Without a pinned peer key, an
 attacker's correctly-signed hello verifies fine. Pass `expected_identity`.
 
+### The page is checked by running it
+
+`.github/checks/` drives the built page in headless Chrome on every push:
+`console.mjs` walks the whole guided lab, both transfer challenges, every
+preset, every caption's "show me", link restoration in both modes and all 384
+reachable configurations; `a11y.mjs` audits contrast over every text-bearing
+element in both themes, operates the lab with no pointer, and checks 640/390/320
+CSS px, the reduced-motion fallback and the screen-reader path.
+
+This exists because the first manual pass of those checks found three defects and
+**two of them had already shipped**: white on the accent measured 2.56:1 in the
+dark theme on the primary action button, and the muted ink was hairline sub-AA in
+both. The crate's tests could not see them and `check-artifact.sh` reads the page
+without running it. A check that runs when someone remembers to run it is a check
+that finds things once.
+
+No Playwright, no Puppeteer. The harness serves `web/` itself and speaks CDP over
+Node's global `WebSocket`; a repository that verifies its linter against a
+recorded SHA has no business pulling a browser-automation dependency tree to test
+one static page.
+
 ## Verification status
 
 Measured on rustc 1.97.1, aarch64-apple-darwin.
@@ -333,8 +357,8 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | Layer captions | 6 panels in `explain.rs`, each carrying the configuration that demonstrates it; every "show me" asserted to produce the verdict its caption claims |
 | Transfer challenges | 2 goals in `lab.rs`, scored by the crate; each asserted solvable by its own solution *and* asserted to reject the near miss a reader would actually make |
 | Teaching guide | [TEACHING.md](TEACHING.md)'s preset table asserted against `lab::SCENARIOS`; every experiment and challenge asserted present |
-| Accessibility | **11 checks driven headlessly** — WCAG AA contrast over every text-bearing element in both themes, the guided flow operable without a pointer, no horizontal scroll at 640/390/320 CSS px, a structured equivalent to the hexdump, and every control named |
-| Console, in a browser | **75 checks driven headlessly** — the full five-experiment run, prediction scoring, link restore, every preset, reset, every caption's "show me", the glossary, both handshake pictures, the hexdump keys, the four-beat indicator, the what-moved report, and both transfer challenges scored condition by condition |
+| Accessibility | **16 checks, in CI on every push** — WCAG AA contrast over every text-bearing element in both themes, the guided flow operable without a pointer, no horizontal scroll at 640/390/320 CSS px, a structured equivalent to the hexdump, and every control named |
+| Console, in a browser | **87 checks, in CI on every push** — the full five-experiment run, prediction scoring, link restore, every preset, reset, every caption's "show me", the glossary, both handshake pictures, the hexdump keys, the four-beat indicator, the what-moved report, and both transfer challenges scored condition by condition |
 | Deployed demo | **384 configurations driven on the published artifact** — every backend × both suites × all 64 layer combinations, none throwing, no console errors |
 | `check-artifact.sh` | every relative reference resolves inside `web/` |
 | `cargo fuzz deobfuscate` | 45,027,157 executions, no crashes |

@@ -134,6 +134,22 @@ jobs:
       - name: Artifact is self-contained
         run: .github/check-artifact.sh
 
+      # `check-artifact.sh` reads the page; these run it. Everything between the
+      # crate's tests and a static file check -- that a switch does what its
+      # caption says, that a link restores what it encoded, that a colour clears
+      # AA -- was verified by hand until now, which means it was verified once.
+      # All three defects the first manual pass found had already shipped.
+      #
+      # ubuntu-latest ships Google Chrome; the harness finds it, serves `web/`
+      # itself and speaks CDP over Node's global WebSocket. No Playwright, no
+      # Puppeteer, no dependency tree in a repository that pins its linter to a
+      # recorded SHA.
+      - name: Console does what the crate says it does
+        run: node .github/checks/console.mjs
+
+      - name: Operable without a mouse, colour perception, or a large window
+        run: node .github/checks/a11y.mjs
+
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: codetalker-wasm-pkg
