@@ -25,11 +25,6 @@ public record.
   it. The Japanese had the speaker and never assembled the team — an operational
   failure on their side rather than cryptographic strength on the Allied side.
 
-**Before publishing.** If this demo goes public, contact the Navajo Code Talkers
-Museum and the Navajo Nation Museum first. The material is theirs, the framing
-should be reviewed by them, and their involvement would be worth more than any
-technical feature in this repository.
-
 ## Specifications implemented
 
 | Spec | Used for |

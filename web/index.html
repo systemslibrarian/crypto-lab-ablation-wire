@@ -399,6 +399,58 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
 .history p:last-child { margin-bottom: 0; }
 .history strong { color: var(--ink); }
 
+/* ------------------------------------------------------------ threat matrix */
+
+.threat-row {
+  display: grid; grid-template-columns: 3.2rem minmax(0, 1fr) auto;
+  gap: 0.5rem 0.9rem; align-items: baseline;
+  padding: 0.6rem 0; border-top: 1px solid var(--line-soft);
+}
+.threat-row:first-child { border-top: 0; }
+.threat-id { font-family: var(--mono); font-size: var(--fs-sm); color: var(--ink-3); }
+.threat-label { font-size: var(--fs-sm); color: var(--ink); }
+.threat-because { grid-column: 2 / -1; font-size: var(--fs-xs); color: var(--ink-2); margin-top: 0.15rem; }
+
+/* Status is carried by the word first and the colour second. A learner with no
+   colour perception, or a printout, must read the same result. */
+.threat-status {
+  font-family: var(--mono); font-size: var(--fs-xs); white-space: nowrap;
+  padding: 0.1rem 0.5rem; border-radius: 999px; border: 1px solid;
+}
+.threat-status::before { margin-right: 0.35rem; font-weight: 700; }
+.st-defended { color: var(--ok); border-color: var(--ok); background: var(--ok-wash); }
+.st-defended::before { content: "\2713"; }
+.st-exposed { color: var(--bad); border-color: var(--bad); background: var(--bad-wash); }
+.st-exposed::before { content: "\2717"; }
+.st-out-of-scope { color: var(--ink-3); border-color: var(--line); background: var(--panel-2); }
+.st-out-of-scope::before { content: "\2014"; }
+
+.leak-row {
+  display: grid; grid-template-columns: minmax(0, 12rem) minmax(0, 1fr); gap: 0.3rem 0.9rem;
+  padding: 0.5rem 0; border-top: 1px solid var(--line-soft); align-items: baseline;
+}
+.leak-row:first-child { border-top: 0; }
+.leak-item { font-size: var(--fs-sm); color: var(--ink); font-weight: 500; }
+.leak-detail { font-size: var(--fs-xs); color: var(--ink-2); }
+@media (max-width: 620px) { .leak-row { grid-template-columns: minmax(0, 1fr); } }
+
+/* The one comparison the ratchet lesson turns on, stated rather than left to
+   whoever is willing to diff two 64-character hex strings by eye. */
+.keycmp { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.6rem; }
+.keycmp span {
+  font-family: var(--mono); font-size: var(--fs-xs);
+  padding: 0.15rem 0.5rem; border-radius: 999px; border: 1px solid var(--line);
+  background: var(--panel-2); color: var(--ink-2);
+}
+.keycmp .differ { color: var(--ok); border-color: var(--ok); background: var(--ok-wash); }
+.keycmp .same { color: var(--bad); border-color: var(--bad); background: var(--bad-wash); }
+
+/* Visually hidden but available to assistive tech. */
+.sr-only {
+  position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
 /* -------------------------------------------------------------------- misc */
 
 .fatal {
@@ -644,7 +696,7 @@ python3 -m http.server -d web 8080</pre>
         <h2>What the adversary recovers</h2>
         <span class="note" id="verdict-note"></span>
       </header>
-      <div class="body">
+      <div class="body" aria-live="polite" aria-atomic="true">
         <div class="verdict-head">
           <span class="verdict-tag" id="verdict-tag">—</span>
           <span class="verdict-headline" id="verdict-headline">—</span>
@@ -654,6 +706,31 @@ python3 -m http.server -d web 8080</pre>
           <div class="eyebrow">Plaintext in the adversary's hands</div>
           <div class="recovered-text" id="recovered-text"></div>
         </div>
+      </div>
+    </section>
+
+    <section class="card" id="threat-card">
+      <header>
+        <h2>Which adversary</h2>
+        <span class="note">A1&ndash;A5, computed for this configuration</span>
+      </header>
+      <div class="body">
+        <p class="hint" style="margin:0 0 0.75rem">
+          &ldquo;Channel holding&rdquo; is never universal. It holds against a named
+          adversary, for a named asset. Definitions are in
+          <a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire/blob/main/THREAT_MODEL.md">THREAT_MODEL.md</a>.
+        </p>
+        <div id="threat-rows"></div>
+      </div>
+    </section>
+
+    <section class="card" id="metadata-card">
+      <header>
+        <h2>What leaks regardless</h2>
+        <span class="note">true in every configuration above</span>
+      </header>
+      <div class="body">
+        <div id="leak-rows"></div>
       </div>
     </section>
 
@@ -694,6 +771,10 @@ python3 -m http.server -d web 8080</pre>
         <div class="wire-meta" id="wire-meta"></div>
         <div class="hexdump" id="hexdump"></div>
         <div class="legend" id="legend"></div>
+        <!-- The ratchet lesson is a comparison between two frames, and asking a
+             reader to diff two 64-character hex strings by eye is asking them not
+             to check. codetalker-core reports the comparison; this renders it. -->
+        <div class="keycmp" id="keycmp"></div>
       </div>
     </section>
 
@@ -863,7 +944,24 @@ function switchEl({ key, name, sub, impl, fault }) {
   label.querySelector(".switch-name").textContent = name;
   label.querySelector(".switch-sub").innerHTML =
     `${sub} · <span class="mono">${impl}</span>`;
-  label.querySelector("input").addEventListener("change", (e) => {
+
+  // The visible text sits in sibling spans, so without this the checkbox
+  // announces as an unnamed control. `aria-describedby` carries the historical
+  // analogue and the module name, which is context rather than identity.
+  const input = label.querySelector("input");
+  const nameId = `sw-${key}-name`;
+  const descId = `sw-${key}-desc`;
+  const whyId = `sw-${key}-why`;
+  label.querySelector(".switch-name").id = nameId;
+  label.querySelector(".switch-sub").id = descId;
+  // `.switch-why` is where syncDependencies writes the reason a switch is
+  // disabled. Announcing "unavailable" without it leaves a keyboard user with a
+  // dead control and no explanation.
+  label.querySelector(".switch-why").id = whyId;
+  input.setAttribute("aria-labelledby", nameId);
+  input.setAttribute("aria-describedby", `${descId} ${whyId}`);
+
+  input.addEventListener("change", (e) => {
     state[key] = e.target.checked;
     run();
   });
@@ -887,15 +985,38 @@ function buildControls() {
     "is checkable from here.";
   box.appendChild(p);
 
-  for (const el of document.querySelectorAll(".frame-tab")) {
-    el.addEventListener("click", () => {
-      activeFrame = Number(el.dataset.frame);
-      for (const t of document.querySelectorAll(".frame-tab")) {
-        t.setAttribute("aria-selected", String(Number(t.dataset.frame) === activeFrame));
-      }
-      if (last) renderWire(last);
+  // A tablist that only answers to a mouse is a tablist in markup only. ARIA
+  // roles were already here; the keyboard behaviour they promise was not.
+  const tabs = [...document.querySelectorAll(".frame-tab")];
+
+  const selectFrame = (i, { focus = false } = {}) => {
+    activeFrame = i;
+    for (const t of tabs) {
+      const on = Number(t.dataset.frame) === activeFrame;
+      t.setAttribute("aria-selected", String(on));
+      // Roving tabindex: one stop for the whole group, so Tab moves past the
+      // tablist rather than through every tab in it.
+      t.tabIndex = on ? 0 : -1;
+    }
+    if (focus) tabs[i].focus();
+    if (last) renderWire(last);
+  };
+
+  for (const el of tabs) {
+    el.addEventListener("click", () => selectFrame(Number(el.dataset.frame)));
+    el.addEventListener("keydown", (e) => {
+      const i = Number(el.dataset.frame);
+      let next = null;
+      if (e.key === "ArrowRight" || e.key === "ArrowDown") next = (i + 1) % tabs.length;
+      else if (e.key === "ArrowLeft" || e.key === "ArrowUp") next = (i - 1 + tabs.length) % tabs.length;
+      else if (e.key === "Home") next = 0;
+      else if (e.key === "End") next = tabs.length - 1;
+      if (next === null) return;
+      e.preventDefault();
+      selectFrame(next, { focus: true });
     });
   }
+  selectFrame(activeFrame);
 
   $("backend").addEventListener("change", run);
   $("suite").addEventListener("change", run);
@@ -956,6 +1077,9 @@ function run() {
   last = result;
   renderVerdict(result);
   renderPad(result, cfg);
+  renderThreats(result);
+  renderLeaks(result);
+  renderKeyCompare(result);
   renderWire(result);
   renderReceiver(result);
   renderFacts(result, cfg);
@@ -978,6 +1102,74 @@ function renderVerdict(r) {
     $("recovered-text").textContent = r.recovered;
   } else {
     box.classList.add("hidden");
+  }
+}
+
+/* The threat matrix and the leak list are rendered, not decided: every status
+   and every clause below arrives from `threat::assess` / `threat::metadata` in
+   codetalker-core. Computing them here would make the most consequential panel
+   on the page the one thing JavaScript made up. */
+
+function renderKeyCompare(r) {
+  const box = $("keycmp");
+  box.innerHTML = "";
+  const pairs = [
+    ["message key", r.keysDiffer, "key 1 \u2260 key 2", "key 1 = key 2"],
+    ["nonce", r.noncesDiffer, "nonce 1 \u2260 nonce 2", "nonce 1 = nonce 2"],
+  ];
+  for (const [, differ, differText, sameText] of pairs) {
+    const el = document.createElement("span");
+    el.className = differ ? "differ" : "same";
+    el.textContent = differ ? differText : sameText;
+    box.appendChild(el);
+  }
+  // Spelling out the consequence, because "same nonce" is only alarming next to
+  // "same key" and the pair is the whole point.
+  const note = document.createElement("span");
+  if (!r.noncesDiffer && !r.keysDiffer) {
+    note.className = "same";
+    note.textContent = "one keystream, twice \u2014 a two-time pad";
+  } else if (!r.noncesDiffer && r.keysDiffer) {
+    note.className = "differ";
+    note.textContent = "repeated nonce, fresh key \u2014 no pad";
+  } else {
+    note.className = "differ";
+    note.textContent = "no keystream is reused";
+  }
+  box.appendChild(note);
+}
+
+function renderThreats(r) {
+  const box = $("threat-rows");
+  box.innerHTML = "";
+  for (const a of r.adversaries) {
+    const row = document.createElement("div");
+    row.className = "threat-row";
+    row.innerHTML =
+      `<span class="threat-id"></span>` +
+      `<span class="threat-label"></span>` +
+      `<span class="threat-status"></span>` +
+      `<span class="threat-because"></span>`;
+    row.querySelector(".threat-id").textContent = a.id;
+    row.querySelector(".threat-label").textContent = a.label;
+    const st = row.querySelector(".threat-status");
+    st.textContent = a.status;
+    st.classList.add("st-" + a.status);
+    row.querySelector(".threat-because").textContent = a.because;
+    box.appendChild(row);
+  }
+}
+
+function renderLeaks(r) {
+  const box = $("leak-rows");
+  box.innerHTML = "";
+  for (const l of r.metadata) {
+    const row = document.createElement("div");
+    row.className = "leak-row";
+    row.innerHTML = `<span class="leak-item"></span><span class="leak-detail"></span>`;
+    row.querySelector(".leak-item").textContent = l.item;
+    row.querySelector(".leak-detail").textContent = l.detail;
+    box.appendChild(row);
   }
 }
 

@@ -62,6 +62,7 @@ codetalker-core/
   src/aead.rs        AES-256-GCM / ChaCha20-Poly1305
   src/transport.rs   L3 -- deliberately weak, see module docs
   src/session.rs     the ablation harness
+  src/threat.rs      which adversary each configuration survives, with reasons
   tests/kat.rs       published known-answer vectors
   tests/ablation.rs  one test per claim the demo makes in prose
   tests/properties.rs proptest coverage of the untrusted parser
@@ -234,12 +235,13 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | Secret independence | **fails, upstream cannot support it** — see Limitations |
 | `cargo audit` | no vulnerabilities; one unmaintained transitive crate, below |
 | `wasm-pack build` | 700 KB module, driven end to end across every ablation |
+| Threat matrix | A1–A5 computed in `threat.rs`; every row of THREAT_MODEL.md asserted in `tests/ablation.rs` |
 | Deployed demo | **384 configurations driven on the published artifact** — every backend × both suites × all 64 layer combinations, none throwing, no console errors |
 | `check-artifact.sh` | every relative reference resolves inside `web/` |
 | `cargo fuzz deobfuscate` | 45,027,157 executions, no crashes |
 | `cargo fuzz identity_verify` | 577,993 classical + 608,145 with `pq`, no crashes |
 | Scheduled fuzzing | nightly, 20 min per target, against a corpus cached between runs — demonstrated: the second run restored 169 seeds and libFuzzer reported them |
-| Line coverage | **83.36%** (81.30% region, 80.00% function), floored at 80% in CI |
+| Line coverage | **84.44%** (82.12% region, 79.78% function), floored at 80% in CI |
 | Build provenance | the published wasm module is signed; `gh attestation verify` checks it |
 | Module size | 706 kB, budgeted at 900 kB by `check-artifact.sh` |
 | Actions pinned | every workflow action pinned to a commit SHA, Dependabot moves them |

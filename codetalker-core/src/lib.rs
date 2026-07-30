@@ -51,6 +51,7 @@ pub mod kdf;
 pub mod kem;
 pub mod ratchet;
 pub mod session;
+pub mod threat;
 pub mod transcript;
 pub mod transport;
 

@@ -9,6 +9,7 @@
 //! what it is told and decides nothing.
 
 use codetalker_core::session::{self, Recovery};
+use codetalker_core::threat;
 use codetalker_core::{aead, kem, transport};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -63,6 +64,27 @@ pub struct FrameView {
     pub segments: Vec<Segment>,
 }
 
+/// One adversary's standing, straight from `threat::assess`. The page renders
+/// these; it does not decide any of them. A threat matrix computed in
+/// JavaScript would be exactly the simulation this crate exists to avoid —
+/// prose dressed as a result.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AdversaryView {
+    pub id: String,
+    pub label: String,
+    pub status: String,
+    pub because: String,
+}
+
+/// Something the wire gives away whatever the switches say.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LeakView {
+    pub item: String,
+    pub detail: String,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Transmission {
@@ -95,6 +117,20 @@ pub struct Transmission {
     pub detail: &'static str,
     pub broken: bool,
     pub recovered: Option<String>,
+
+    /// A1-A5 against this configuration, each with the clause that decided it.
+    pub adversaries: Vec<AdversaryView>,
+    /// What stays visible on the wire regardless.
+    pub metadata: Vec<LeakView>,
+
+    /// Whether the two frames were sealed under different keys and nonces.
+    ///
+    /// Reported rather than left to the reader, because the alternative is
+    /// asking someone to eyeball two 64-character hex strings and decide
+    /// whether they match — which is the one comparison the whole ratchet
+    /// lesson turns on.
+    pub keys_differ: bool,
+    pub nonces_differ: bool,
 }
 
 #[derive(Serialize)]
@@ -278,6 +314,23 @@ pub fn transmit(config: JsValue) -> Result<JsValue, JsValue> {
         detail,
         broken: recovery.is_broken(),
         recovered,
+
+        adversaries: threat::assess(layers, sender.hs.kem_is_pq)
+            .iter()
+            .map(|a| AdversaryView {
+                id: a.id.to_string(),
+                label: a.label.to_string(),
+                status: a.status.as_str().to_string(),
+                because: a.because.to_string(),
+            })
+            .collect(),
+        metadata: threat::metadata(layers)
+            .iter()
+            .map(|l| LeakView { item: l.item.to_string(), detail: l.detail.to_string() })
+            .collect(),
+
+        keys_differ: f1.message_key != f2.message_key,
+        nonces_differ: f1.nonce != f2.nonce,
     };
     serde_wasm_bindgen::to_value(&out).map_err(js)
 }

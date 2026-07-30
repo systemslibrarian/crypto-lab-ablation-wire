@@ -511,3 +511,159 @@ fn kem_reports_its_own_pq_status_truthfully() {
     #[cfg(feature = "pq")]
     assert!(kem::backend("xwing").unwrap().is_pq());
 }
+
+// ---------------------------------------------------------------------------
+// The threat matrix. THREAT_MODEL.md publishes a table of which configuration
+// survives which adversary; these assert the code agrees with it, row for row,
+// so the document and the module cannot drift apart silently.
+// ---------------------------------------------------------------------------
+
+use codetalker_core::threat::{self, Status};
+
+/// Read a row of the published table as (A1, A2, A3, A4).
+fn row(layers: Layers, kem_is_pq: bool) -> [Status; 4] {
+    let a = threat::assess(layers, kem_is_pq);
+    [a[0].status, a[1].status, a[2].status, a[3].status]
+}
+
+const D: Status = Status::Defended;
+const X: Status = Status::Exposed;
+
+#[test]
+fn threat_table_full_stack_pq_survives_every_adversary_in_scope() {
+    assert_eq!(row(Layers::default(), true), [D, D, D, D]);
+}
+
+#[test]
+fn threat_table_full_stack_classical_falls_only_to_the_quantum_adversary() {
+    assert_eq!(row(Layers::default(), false), [D, D, D, X]);
+}
+
+#[test]
+fn threat_table_without_authentication_only_the_active_attacker_wins() {
+    let l = Layers { authenticate: false, ..Layers::default() };
+    assert_eq!(row(l, true), [D, X, D, D]);
+}
+
+#[test]
+fn threat_table_without_a_ratchet_key_compromise_opens_the_archive() {
+    let l = Layers { ratchet: false, ..Layers::default() };
+    assert_eq!(row(l, true), [D, D, X, D]);
+}
+
+#[test]
+fn threat_table_without_key_agreement_everything_falls() {
+    let l = Layers { key_agreement: false, ..Layers::default() };
+    assert_eq!(row(l, true), [X, X, X, X]);
+}
+
+#[test]
+fn threat_table_without_aead_everything_falls() {
+    let l = Layers { aead: false, ..Layers::default() };
+    assert_eq!(row(l, true), [X, X, X, X]);
+}
+
+/// The two halves of the nonce claim, as a threat-model statement this time.
+/// The same distinction `nonce_reuse_with_a_ratchet_yields_no_pad_at_all` makes
+/// about recovery has to hold here too, or the matrix would contradict the
+/// verdict shown beside it.
+#[test]
+fn threat_table_repeated_nonce_is_survivable_while_the_ratchet_runs() {
+    let l = Layers { nonce_reuse: true, ratchet: true, ..Layers::default() };
+    assert_eq!(row(l, true), [D, D, D, D]);
+}
+
+#[test]
+fn threat_table_repeated_nonce_without_a_ratchet_falls_to_everyone() {
+    let l = Layers { nonce_reuse: true, ratchet: false, ..Layers::default() };
+    assert_eq!(row(l, true), [X, X, X, X]);
+}
+
+/// A5 is an admission, not a claim, and must never read as either defended or
+/// merely exposed — the crate does not measure it at all.
+#[test]
+fn side_channel_adversary_is_reported_as_out_of_scope_not_as_defeated() {
+    for pq in [true, false] {
+        for l in [Layers::default(), Layers { aead: false, ..Layers::default() }] {
+            let a = threat::assess(l, pq);
+            assert_eq!(a[4].id, "A5");
+            assert_eq!(a[4].status, Status::OutOfScope);
+        }
+    }
+}
+
+/// Every judgement has to name the layer responsible. A verdict with an empty
+/// or generic clause is the cross-with-no-explanation this module exists to
+/// avoid.
+#[test]
+fn every_adversary_verdict_explains_itself() {
+    for pq in [true, false] {
+        for mask in 0u8..32 {
+            let l = Layers {
+                key_agreement: mask & 1 != 0,
+                aead: mask & 2 != 0,
+                transport: mask & 4 != 0,
+                authenticate: mask & 8 != 0,
+                ratchet: mask & 16 != 0,
+                nonce_reuse: false,
+            };
+            for a in threat::assess(l, pq) {
+                assert!(
+                    a.because.len() > 20,
+                    "{} has no real reason: {:?}",
+                    a.id,
+                    a.because
+                );
+                assert!(!a.id.is_empty() && !a.label.is_empty());
+            }
+        }
+    }
+}
+
+/// The transport layer must never be presented as hiding length, because it
+/// does not. `obfuscate` pads to a block and then writes the true unpadded
+/// length in the clear at offset 4, so the observer gets the exact figure either
+/// way — and that is the claim this asserts against the actual bytes.
+#[test]
+fn padding_does_not_hide_length_because_the_framing_announces_it() {
+    let msg = b"exactly nineteen ch";
+    let wire = transport::obfuscate(msg, 64);
+
+    // 4 framing bytes + a 4-byte length prefix + the body padded up to the block.
+    assert_eq!(
+        wire.len(),
+        8 + 64,
+        "19 bytes pads to one 64-byte block behind an 8-byte header"
+    );
+
+    let announced = u32::from_be_bytes([wire[4], wire[5], wire[6], wire[7]]) as usize;
+    assert_eq!(
+        announced,
+        msg.len(),
+        "the framing states the exact unpadded length, so padding quantises nothing"
+    );
+
+    let leaks = threat::metadata(Layers::default());
+    assert!(
+        leaks.iter().any(|l| l.item == "exact message length"),
+        "the metadata summary must say the length is exposed"
+    );
+    assert!(
+        leaks.iter().any(|l| l.item == "frame structure"),
+        "the 0xAA marker is a fingerprint and must be listed"
+    );
+}
+
+#[test]
+fn metadata_always_admits_that_the_channel_and_its_timing_are_visible() {
+    for transport_on in [true, false] {
+        let l = Layers { transport: transport_on, ..Layers::default() };
+        let leaks = threat::metadata(l);
+        assert!(leaks.iter().any(|x| x.item == "channel exists"));
+        assert!(leaks.iter().any(|x| x.item == "timing and frequency"));
+        assert!(leaks.iter().any(|x| x.item == "exact message length"));
+        for x in &leaks {
+            assert!(x.detail.len() > 20, "{} needs a real explanation", x.item);
+        }
+    }
+}
