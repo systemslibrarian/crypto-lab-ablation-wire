@@ -83,6 +83,27 @@ jobs:
           cargo clippy --manifest-path codetalker-wasm/Cargo.toml
           --target wasm32-unknown-unknown --all-targets -- -D warnings
 
+      # The workflows lint too, because they are the one part of this repository
+      # that nothing else compiles. A `|` block scalar ends at the first line
+      # indented less than the block, so a multi-line inline script starting in
+      # column 0 truncates the YAML mid-step -- which is exactly how the coverage
+      # job shipped broken, and GitHub reports it only as "a workflow file issue"
+      # with no line number.
+      #
+      # Downloaded at a pinned version and checked against a recorded SHA-256,
+      # rather than the upstream `curl | bash` installer. A repository that pins
+      # every action to a commit SHA should not fetch a linter from a branch.
+      - name: actionlint
+        env:
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+        run: |
+          tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          curl -sSfLO "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${tarball}"
+          echo "${ACTIONLINT_SHA256}  ${tarball}" | sha256sum --check --status
+          tar xzf "$tarball" actionlint
+          ./actionlint -color
+
   wasm:
     runs-on: ubuntu-latest
     steps:
@@ -253,19 +274,16 @@ jobs:
       # A floor, not a target. Set just under the measured value so it catches a
       # real regression without inviting tests written to colour a report green.
       # Coverage that gets chased is coverage that stops meaning anything.
+      # awk rather than an inline Python heredoc: a `|` block scalar ends at the
+      # first line indented less than the block, so a multi-line script whose
+      # body starts in column 0 silently terminates the YAML mid-step. That is
+      # what broke this workflow the first time it ran.
       - name: Floor
         run: |
           pct=$(python3 -c "import json;print(json.load(open('coverage.json'))['data'][0]['totals']['lines']['percent'])")
           printf 'line coverage: %.2f%%\n' "$pct"
           echo "line coverage: $(printf '%.2f' "$pct")%" >> "$GITHUB_STEP_SUMMARY"
-          python3 -c "
-import sys
-pct = $pct
-floor = 80.0
-if pct < floor:
-    sys.exit(f'coverage {pct:.2f}% fell below the {floor}% floor')
-print(f'{pct:.2f}% >= {floor}% floor')
-"
+          awk -v p="$pct" -v f=80 'BEGIN { if (p < f) { printf "coverage %.2f%% is below the %g%% floor\n", p, f; exit 1 } printf "%.2f%% >= %g%% floor\n", p, f }'
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
