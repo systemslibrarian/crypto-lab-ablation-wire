@@ -198,14 +198,28 @@ export async function withPage(fn) {
       });
       await client.send("Page.navigate", { url });
       for (let i = 0; i < 120; i++) {
-        const ready = await client.ev(`!document.getElementById('console')?.hidden`)
-          .catch(() => false);
-        if (ready) return;
+        // `!document.getElementById('console')?.hidden` is `true` when there is
+        // no `#console` at all, so the first version of this returned the
+        // instant it was called -- on about:blank, before the navigation had
+        // even started. It passed locally, where navigation beat the first
+        // poll, and failed in CI, where it did not. Optional chaining is the
+        // wrong tool for "is this element present and showing".
+        const state = await client.ev(`(() => {
+          const c = document.getElementById('console');
+          const f = document.getElementById('fatal');
+          if (f && !f.classList.contains('hidden')) return 'fatal';
+          return c && !c.hidden ? 'ready' : 'waiting';
+        })()`).catch(() => "waiting");
+        if (state === "ready") return;
+        // The module failing to load is a real answer, not something to keep
+        // waiting twelve seconds for.
+        if (state === "fatal") {
+          const why = await client.ev(`document.getElementById('fatal').textContent`);
+          throw new Error(`the module did not load at ${url}\n${why.trim().slice(0, 400)}`);
+        }
         await new Promise((r) => setTimeout(r, 100));
       }
-      const fatal = await client.ev(
-        `document.getElementById('fatal')?.textContent ?? 'no #fatal'`).catch(() => "");
-      throw new Error(`the console never appeared at ${url}\n${fatal.slice(0, 400)}`);
+      throw new Error(`the console never appeared at ${url} after 12s`);
     };
     await fn({ ...client, goto, base });
   } finally {
