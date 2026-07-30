@@ -49,6 +49,7 @@ pub mod handshake;
 pub mod identity;
 pub mod kdf;
 pub mod kem;
+pub mod lab;
 pub mod ratchet;
 pub mod session;
 pub mod threat;
@@ -56,4 +57,4 @@ pub mod transcript;
 pub mod transport;
 
 pub use error::{Error, Result};
-pub use session::{adversary, establish, Channel, Frame, Layers, Recovery};
+pub use session::{adversary, establish, exchange, Channel, Exchange, Frame, Layers, Recovery};

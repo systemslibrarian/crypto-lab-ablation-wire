@@ -667,3 +667,196 @@ fn metadata_always_admits_that_the_channel_and_its_timing_are_visible() {
         }
     }
 }
+
+// ---------------------------------------------------------------------------
+// The guided lab. Every experiment declares an outcome; the channel produces
+// one. These are the tests that make the first claim mean something.
+// ---------------------------------------------------------------------------
+
+use codetalker_core::lab;
+
+/// Run a lab setup through the real channel and report the outcome tag.
+///
+/// `setup.kem` is deliberately ignored. It pins a backend for the one scenario
+/// that is *about* the backend, and honouring it here would make these
+/// assertions silently un-runnable under `--no-default-features --features pq`,
+/// where x25519 does not exist. No outcome in the lab depends on the KEM, and
+/// `every_pinned_backend_is_a_backend` covers the pin itself.
+fn outcome(setup: lab::Setup) -> String {
+    let kem = k();
+    session::exchange(
+        &*kem,
+        setup.layers,
+        SUITE,
+        setup.adversary_knows_transport,
+        b"Request immediate air support at grid 214 by 0600.",
+        b"Enemy armour massing north of the ridge line tonight.",
+    )
+    .expect("a lab setup must be one the channel can actually run")
+    .recovery
+    .tag()
+    .to_string()
+}
+
+#[test]
+fn every_guided_step_produces_the_outcome_it_teaches() {
+    for step in lab::STEPS {
+        assert_eq!(
+            outcome(step.before),
+            step.expect_before,
+            "{}: the starting state does not do what the step says it does",
+            step.id
+        );
+        assert_eq!(
+            outcome(step.after),
+            step.expect_after,
+            "{}: the experiment does not produce its own stated result",
+            step.id
+        );
+    }
+}
+
+#[test]
+fn every_preset_produces_the_outcome_it_advertises() {
+    for s in lab::SCENARIOS {
+        assert_eq!(outcome(s.setup), s.expect, "preset {} is mislabelled", s.id);
+    }
+}
+
+/// The step tells the reader which switches to move and the page highlights
+/// them from `moves`. If that list and the actual difference between the two
+/// setups disagree, the instruction points at the wrong control during the one
+/// beat of the lesson that is about where to look.
+#[test]
+fn every_step_moves_exactly_the_switches_it_names() {
+    for step in lab::STEPS {
+        assert_eq!(
+            step.before.diff(&step.after),
+            step.moves,
+            "{}: the named controls and the actual change disagree",
+            step.id
+        );
+        assert!(
+            !step.moves.is_empty(),
+            "{}: an experiment must change something",
+            step.id
+        );
+        for m in step.moves {
+            assert!(
+                lab::SWITCHES.contains(m),
+                "{}: {m} is not a console switch",
+                step.id
+            );
+        }
+    }
+}
+
+/// A prediction that is never correct teaches readers to skip the list.
+#[test]
+fn every_prediction_offered_is_the_right_answer_to_some_step() {
+    for o in lab::OUTCOMES {
+        assert!(
+            lab::STEPS.iter().any(|s| s.expect_after == o.tag),
+            "{} is offered as a prediction and is never the answer",
+            o.tag
+        );
+    }
+}
+
+/// Conversely: every outcome the channel can reach must be offered, or a reader
+/// is asked to predict something the form cannot express.
+#[test]
+fn every_outcome_the_channel_reaches_is_offered_as_a_prediction() {
+    for tag in [
+        "MetadataOnly",
+        "Plaintext",
+        "MachineInTheMiddle",
+        "KeystreamReuse",
+    ] {
+        assert!(
+            lab::OUTCOMES.iter().any(|o| o.tag == tag),
+            "{tag} is a real verdict with no prediction to match it"
+        );
+    }
+}
+
+/// The first experiment is a null result, and it is the most important one in
+/// the sequence: the fluent speaker changes nothing. Every other step has to
+/// change something, or it is not an experiment.
+#[test]
+fn only_the_kieyoomia_step_leaves_the_outcome_unchanged() {
+    for step in lab::STEPS {
+        let unchanged = step.expect_before == step.expect_after;
+        assert_eq!(
+            unchanged,
+            step.id == "kieyoomia",
+            "{}: expected {} to change the outcome",
+            step.id,
+            if step.id == "kieyoomia" {
+                "nothing"
+            } else {
+                "something"
+            }
+        );
+    }
+}
+
+/// A result with no adversary attached is not a security result, and a debrief
+/// that does not explain the change is decoration.
+#[test]
+fn every_step_names_an_adversary_and_explains_the_change() {
+    for step in lab::STEPS {
+        assert!(
+            step.adversary.starts_with('A') && step.adversary.len() > 2,
+            "{}: {:?} does not name an adversary from THREAT_MODEL.md",
+            step.id,
+            step.adversary
+        );
+        assert!(
+            step.explain.len() > 80,
+            "{}: the debrief says too little",
+            step.id
+        );
+        assert!(step.concept.len() > 20, "{}: no concept stated", step.id);
+        assert!(!step.question.is_empty() && !step.instruction.is_empty());
+    }
+}
+
+/// A preset is a shortcut into a state a reader could have reached by hand.
+/// One that pins a backend this build does not contain would land them nowhere.
+#[test]
+fn every_pinned_backend_is_a_backend() {
+    for s in lab::SCENARIOS {
+        let Some(name) = s.setup.kem else { continue };
+        assert!(
+            ["static", "x25519", "xwing"].contains(&name),
+            "preset {} pins {name}, which is not a KEM id",
+            s.id
+        );
+    }
+}
+
+/// The guided sequence chains: experiment 2 depends on the adversary keeping
+/// the fluent speaker experiment 1 gave them, because "the same adversary who
+/// got nothing a moment ago" is the entire force of the second result.
+#[test]
+fn the_obscurity_step_inherits_the_adversary_from_the_kieyoomia_step() {
+    let kieyoomia = lab::STEPS.iter().find(|s| s.id == "kieyoomia").unwrap();
+    let obscurity = lab::STEPS.iter().find(|s| s.id == "obscurity-only").unwrap();
+    assert_eq!(obscurity.before, kieyoomia.after);
+    assert!(obscurity.after.adversary_knows_transport);
+}
+
+/// The two nonce experiments are a pair, and the second only means anything
+/// while the fault the first injected is still injected.
+#[test]
+fn the_ratchet_step_keeps_the_nonce_fault_the_pad_step_injected() {
+    let pad = lab::STEPS.iter().find(|s| s.id == "two-time-pad").unwrap();
+    let ratchet = lab::STEPS.iter().find(|s| s.id == "ratchet-saves-it").unwrap();
+    assert_eq!(ratchet.before, pad.after);
+    assert!(
+        ratchet.after.layers.nonce_reuse,
+        "switching the ratchet on while quietly clearing the nonce fault would prove nothing"
+    );
+    assert!(ratchet.after.layers.ratchet);
+}

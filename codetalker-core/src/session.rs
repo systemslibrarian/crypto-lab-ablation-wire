@@ -13,7 +13,7 @@ use rand_core::RngCore;
 
 /// Which layers are engaged. Maps onto the 1942 stack, plus the two layers
 /// that stack never had.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Layers {
     /// L1 — key agreement. 1942: the pre-shared codebook.
     pub key_agreement: bool,
@@ -57,6 +57,23 @@ pub enum Recovery {
 impl Recovery {
     pub fn is_broken(&self) -> bool {
         !matches!(self, Recovery::MetadataOnly)
+    }
+
+    /// A stable name for this outcome, without the payload.
+    ///
+    /// The demo needs to *compare* outcomes — a guided experiment declares what
+    /// it expects and [`lab`](crate::lab) is asserted against what the channel
+    /// actually produced — and comparing whole `Recovery` values would compare
+    /// the recovered bytes too, which differ with the message. Spelling these
+    /// names in the browser shim instead would put the vocabulary the curriculum
+    /// is written in outside the reach of any test.
+    pub fn tag(&self) -> &'static str {
+        match self {
+            Recovery::Plaintext(_) => "Plaintext",
+            Recovery::KeystreamReuse(_) => "KeystreamReuse",
+            Recovery::MachineInTheMiddle(_) => "MachineInTheMiddle",
+            Recovery::MetadataOnly => "MetadataOnly",
+        }
     }
 }
 
@@ -333,6 +350,80 @@ pub fn adversary(
     }
 
     Ok(Recovery::MetadataOnly)
+}
+
+/// One complete transmission: two frames sent, the recipient's read, and what
+/// the adversary got.
+pub struct Exchange {
+    pub sender: Channel,
+    /// The party at the other end. With `authenticate` off this is the attacker
+    /// rather than the intended peer, which is the whole point of that
+    /// configuration and not an error condition.
+    pub peer: Channel,
+    pub frames: [Frame; 2],
+    /// What came back out at the other end, if the frame opened at all.
+    pub roundtrip: Option<Vec<u8>>,
+    /// The cheapest attack that works against this configuration.
+    pub recovery: Recovery,
+    /// Whether `peer` is the attacker.
+    pub mitm: bool,
+}
+
+/// Run one transmission end to end and score it.
+///
+/// This is the flow the browser demo performs, and it lives here rather than in
+/// the WASM shim for two reasons. The shim has no test suite, so every decision
+/// taken there — which of two attacks to report, whether the round trip
+/// succeeded, who the peer even is — was a decision nothing checked. And
+/// [`lab`](crate::lab) declares an expected outcome for every guided experiment;
+/// asserting those against a reimplementation of this sequence would assert that
+/// two copies agree, not that the demo teaches what it claims.
+pub fn exchange(
+    kem: &dyn Kem,
+    layers: Layers,
+    suite: Suite,
+    adversary_knows_transport: bool,
+    m1: &[u8],
+    m2: &[u8],
+) -> Result<Exchange> {
+    // With authentication off, the party on the other end is the attacker, and
+    // it got there by running a real handshake the victim could not distinguish
+    // from the genuine one.
+    let (mut sender, mut peer) = if layers.authenticate {
+        establish(kem, layers, suite)?
+    } else {
+        establish_mitm(kem, layers, suite)?
+    };
+
+    let f1 = sender.send(layers, m1)?;
+    let f2 = sender.send(layers, m2)?;
+
+    // The peer's decrypt and the attacker's are the same operation when the peer
+    // *is* the attacker, so it must not be run twice — the receiving chain
+    // advances on every call.
+    let (mitm, roundtrip) = if layers.authenticate {
+        (None, peer.recv(layers, &f1).ok())
+    } else {
+        let r = adversary_mitm(&mut peer, layers, &f1)?;
+        let pt = match &r {
+            Recovery::MachineInTheMiddle(p) => Some(p.clone()),
+            _ => None,
+        };
+        (Some(r), pt)
+    };
+
+    let passive = adversary(&sender, &f1, layers, adversary_knows_transport)?;
+
+    // Report the cheapest attack that works. A passive observer who already
+    // reads the traffic does not need to stand in the middle of it, and
+    // reporting the active break there would credit authentication with a
+    // failure that belongs to the layer underneath it.
+    let recovery = match (&passive, mitm) {
+        (Recovery::MetadataOnly, Some(active)) => active,
+        _ => passive,
+    };
+
+    Ok(Exchange { sender, peer, frames: [f1, f2], roundtrip, recovery, mitm: !layers.authenticate })
 }
 
 /// Recover a plaintext from two ciphertexts sharing a key and nonce.

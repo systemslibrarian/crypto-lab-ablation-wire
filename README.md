@@ -25,6 +25,41 @@ because the codebook was doing the work. See [SOURCES.md](SOURCES.md).
 `tests/ablation.rs` encodes that as an assertion:
 `kieyoomia_linguist_without_codebook_recovers_nothing`.
 
+## The guided lab
+
+The console opens on a five-experiment sequence rather than on thirty-two layer
+combinations and no order to take them in. Each experiment states a starting
+state, asks for a prediction, moves one named control, and then explains what
+changed and which adversary it defeated or let in.
+
+| # | experiment | change | result | concept |
+|---|---|---|---|---|
+| 1 | The fluent speaker | give the adversary a fluent speaker | metadata only, unchanged | recognising the language is not holding the codebook |
+| 2 | Obscurity on its own | that same adversary, key agreement and AEAD off | full plaintext | a transformed wire is not a confidential one |
+| 3 | A valid signature from the wrong peer | peer authentication off | delivered to the attacker | encryption without a pinned identity stops nobody active |
+| 4 | One keystream, twice | ratchet already off, repeat the nonce | message 2 from a crib for message 1 | a repeated nonce bites only when the key repeats too |
+| 5 | The ratchet earns its place | leave the nonce repeating, ratchet back on | metadata only | nonce uniqueness is a per-key requirement |
+
+The sequence chains deliberately. Experiment 2 keeps the adversary experiment 1
+handed a speaker to, so the reader watches the *same* adversary who got nothing a
+moment ago read everything — which is a different lesson from watching a fresh
+adversary succeed.
+
+All of it lives in `lab.rs` rather than in the page, and that is the point. Every
+experiment declares the outcome it expects before and after its change, and
+`tests/ablation.rs` runs each one through the real channel and compares. A lesson
+authored in HTML could promise a result the crate does not produce and nothing
+would notice — in a demo whose whole argument is that the numbers come from the
+crate, that would be the one panel on the screen that was merely asserted. The
+same tests pin the switches each step names against the actual difference between
+its two configurations, and require every prediction offered to be the right
+answer somewhere.
+
+The seven presets in the bar are the same data and are asserted the same way.
+Any configuration is a link: the address bar carries the switches, the backend,
+the AEAD suite, both messages and — in guided mode — the experiment and whether
+its result is showing, so `#m=g&s=3&st=r` opens experiment 3 at its debrief.
+
 ## The handshake is real
 
 `handshake` runs two parties exchanging two messages. Neither function generates
@@ -63,6 +98,7 @@ codetalker-core/
   src/transport.rs   L3 -- deliberately weak, see module docs
   src/session.rs     the ablation harness
   src/threat.rs      which adversary each configuration survives, with reasons
+  src/lab.rs         the guided sequence and the presets, as data
   tests/kat.rs       published known-answer vectors
   tests/ablation.rs  one test per claim the demo makes in prose
   tests/properties.rs proptest coverage of the untrusted parser
@@ -224,9 +260,9 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 
 | | status |
 |---|---|
-| `default` (classical) | clean build, 0 warnings, **43/43 tests passing** |
-| `--no-default-features --features pq` | **42/42** — the pure post-quantum build |
-| `--no-default-features --features classical,pq` | **45/45**, both suites present |
+| `default` (classical) | clean build, 0 warnings, **65/65 tests passing** |
+| `--no-default-features --features pq` | **64/64** — the pure post-quantum build |
+| `--no-default-features --features classical,pq` | **67/67**, both suites present |
 | MSRV, rustc 1.85 | builds `classical,pq` clean |
 | FIPS 203 vectors | 35 ML-KEM-768 decapsulation vectors verified |
 | FIPS 204 vectors | ML-DSA-65 signature verification, valid and invalid cases |
@@ -236,14 +272,16 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | `cargo audit` | no vulnerabilities; one unmaintained transitive crate, below |
 | `wasm-pack build` | 700 KB module, driven end to end across every ablation |
 | Threat matrix | A1–A5 computed in `threat.rs`; every row of THREAT_MODEL.md asserted in `tests/ablation.rs` |
+| Guided lab | 5 experiments and 7 presets in `lab.rs`; every declared outcome run through the real channel in `tests/ablation.rs` |
+| Guided lab, in a browser | **47 checks driven headlessly** — the full five-experiment run, prediction scoring, link restore, every preset, and reset |
 | Deployed demo | **384 configurations driven on the published artifact** — every backend × both suites × all 64 layer combinations, none throwing, no console errors |
 | `check-artifact.sh` | every relative reference resolves inside `web/` |
 | `cargo fuzz deobfuscate` | 45,027,157 executions, no crashes |
 | `cargo fuzz identity_verify` | 577,993 classical + 608,145 with `pq`, no crashes |
 | Scheduled fuzzing | nightly, 20 min per target, against a corpus cached between runs — demonstrated: the second run restored 169 seeds and libFuzzer reported them |
-| Line coverage | **84.44%** (82.12% region, 79.78% function), floored at 80% in CI |
+| Line coverage | **81.19%** (81.06% region, 74.00% function), floored at 80% in CI |
 | Build provenance | the published wasm module is signed; `gh attestation verify` checks it |
-| Module size | 706 kB, budgeted at 900 kB by `check-artifact.sh` |
+| Module size | 724 kB, budgeted at 900 kB by `check-artifact.sh` |
 | Actions pinned | every workflow action pinned to a commit SHA, Dependabot moves them |
 | `forbid(unsafe_code)` | enforced by the compiler, not asserted in prose |
 | RustCrypto 0.11 / dalek 3.0 | migrated; every published vector still reproduces byte for byte |

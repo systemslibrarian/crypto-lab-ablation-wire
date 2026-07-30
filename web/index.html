@@ -445,6 +445,120 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
 .keycmp .differ { color: var(--ok); border-color: var(--ok); background: var(--ok-wash); }
 .keycmp .same { color: var(--bad); border-color: var(--bad); background: var(--bad-wash); }
 
+/* --------------------------------------------------------------- lab mode */
+
+/* The bar and the lab card span both columns: the mode, the presets and the
+   current experiment are about the whole console, not about the rail. */
+.labbar, .lab { grid-column: 1 / -1; }
+
+.labbar {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1rem;
+  padding: 0.6rem 0.75rem;
+  border: 1px solid var(--line); border-radius: var(--radius);
+  background: var(--panel); box-shadow: var(--shadow);
+}
+.modes { display: flex; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+.mode {
+  font: inherit; font-size: var(--fs-sm); font-weight: 600;
+  padding: 0.35rem 0.8rem; border: 0; cursor: pointer;
+  background: var(--panel); color: var(--ink-2);
+}
+.mode + .mode { border-left: 1px solid var(--line); }
+.mode[aria-pressed="true"] { background: var(--accent); color: #fff; }
+
+.presets { display: flex; flex-wrap: wrap; gap: 0.35rem; flex: 1 1 auto; min-width: 0; }
+.preset {
+  font: inherit; font-size: var(--fs-xs); font-family: var(--mono);
+  padding: 0.3rem 0.6rem; cursor: pointer;
+  border: 1px solid var(--line); border-radius: 999px;
+  background: var(--panel-2); color: var(--ink-2);
+}
+.preset:hover { border-color: var(--accent); color: var(--accent-ink); }
+/* Weight and a doubled border as well as the wash: the pressed state has to
+   survive a light theme, where --accent-wash is nearly the panel colour. */
+.preset[aria-pressed="true"] {
+  background: var(--accent-wash); border-color: var(--accent); color: var(--accent-ink);
+  font-weight: 700; box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.labbar-tools { display: flex; gap: 0.35rem; }
+.ghost, .primary {
+  font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
+  padding: 0.35rem 0.75rem; border-radius: 4px; border: 1px solid var(--line);
+  background: var(--panel); color: var(--ink-2);
+}
+.ghost:hover { border-color: var(--accent); color: var(--accent-ink); }
+.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
+.primary:disabled { opacity: 0.45; cursor: not-allowed; background: var(--accent); }
+
+.lab { border-left: 4px solid var(--accent); }
+.lab .body { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 1.25rem; }
+@media (max-width: 720px) { .lab .body { grid-template-columns: minmax(0, 1fr); } }
+
+.lab-track { list-style: none; display: flex; flex-direction: column; gap: 0.15rem; }
+.lab-track button {
+  font: inherit; font-size: var(--fs-xs); text-align: left; width: 100%;
+  display: grid; grid-template-columns: 1.4rem 1fr; gap: 0.5rem; align-items: baseline;
+  padding: 0.35rem 0.4rem; border: 0; border-radius: 4px; cursor: pointer;
+  background: transparent; color: var(--ink-3);
+}
+.lab-track button:hover { background: var(--panel-2); }
+.lab-track .n { font-family: var(--mono); }
+.lab-track [aria-current="step"] { background: var(--accent-wash); color: var(--accent-ink); font-weight: 600; }
+/* Status by mark as well as colour, so the track survives monochrome. */
+.lab-track .done .n::after { content: " ✓"; }
+
+.lab-title { font-family: var(--serif); font-size: var(--fs-lg); letter-spacing: -0.01em; }
+.lab-concept { margin: 0.3rem 0 0; color: var(--ink-2); max-width: 68ch; }
+.lab-instruction {
+  margin: 0.85rem 0 0; padding: 0.55rem 0.7rem;
+  border: 1px solid var(--line); border-left: 3px solid var(--accent);
+  border-radius: 4px; background: var(--panel-2);
+  font-size: var(--fs-sm); color: var(--ink);
+}
+.lab-start { font-size: var(--fs-xs); color: var(--ink-3); margin: 0.35rem 0 0; }
+
+.predict { margin-top: 1rem; border: 0; }
+.predict legend { font-size: var(--fs-sm); font-weight: 600; color: var(--ink-2); padding: 0; }
+.predict-options { display: flex; flex-direction: column; gap: 0.1rem; margin: 0.5rem 0 0.75rem; }
+.predict-options label {
+  display: flex; gap: 0.55rem; align-items: baseline;
+  padding: 0.4rem 0.5rem; margin: 0 -0.5rem; border-radius: 4px;
+  font-size: var(--fs-sm); cursor: pointer;
+}
+.predict-options label:hover { background: var(--panel-2); }
+.predict-options input { margin: 0; accent-color: var(--accent); }
+
+.lab-reveal { margin-top: 1rem; }
+.lab-outcome {
+  margin: 0; font-size: var(--fs-sm); font-weight: 600;
+  padding: 0.5rem 0.7rem; border-radius: 4px; border: 1px solid var(--line);
+}
+/* The word carries the result; the colour only agrees with it. */
+.lab-outcome.right { border-color: var(--ok); background: var(--ok-wash); color: var(--ok); }
+.lab-outcome.wrong { border-color: var(--warn); background: var(--warn-wash); color: var(--warn); }
+.lab-outcome.drift { border-color: var(--bad); background: var(--bad-wash); color: var(--bad); }
+.lab-explain { margin: 0.7rem 0 0; color: var(--ink-2); max-width: 68ch; }
+.lab-adversary {
+  margin: 0.6rem 0 0; font-family: var(--mono); font-size: var(--fs-xs); color: var(--ink-3);
+}
+.lab-nav { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 1rem; }
+
+/* The observe beat: after a change, say which values moved rather than leaving
+   the reader to re-scan the whole console for it. */
+@keyframes flashring {
+  from { box-shadow: 0 0 0 3px var(--accent), var(--shadow); }
+  to   { box-shadow: 0 0 0 3px transparent, var(--shadow); }
+}
+.flash { animation: flashring 1.6s ease-out; }
+/* The global reduced-motion rule kills the animation, which would leave the
+   observe beat pointing at nothing. An outline carries the same information
+   without moving; JS clears it on the same schedule either way. */
+@media (prefers-reduced-motion: reduce) {
+  .flash { outline: 2px solid var(--accent); outline-offset: 2px; }
+}
+
 /* Visually hidden but available to assistive tech. */
 .sr-only {
   position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
@@ -635,6 +749,61 @@ python3 -m http.server -d web 8080</pre>
 </div>
 
 <main class="console" id="console" hidden>
+
+  <!-- ----------------------------------------------------------- lab bar -->
+  <div class="labbar">
+    <div class="modes" role="group" aria-label="Console mode">
+      <button type="button" class="mode" id="mode-guided" aria-pressed="true">Guided lab</button>
+      <button type="button" class="mode" id="mode-explore" aria-pressed="false">Explore</button>
+    </div>
+    <div class="presets" id="presets" role="group" aria-label="Scenario presets"></div>
+    <div class="labbar-tools">
+      <!-- The address bar already carries the configuration; this is the
+           convenience, not the mechanism. -->
+      <button type="button" class="ghost" id="copy-link">Copy link</button>
+      <button type="button" class="ghost" id="reset">Reset</button>
+    </div>
+  </div>
+
+  <!-- ------------------------------------------------------------ guided -->
+  <!-- Every string in this card comes from `codetalker_core::lab` and every
+       outcome it predicts is asserted against the real channel in
+       tests/ablation.rs. A lesson authored here in HTML would be the one panel
+       on the page that nothing checks. -->
+  <section class="card lab" id="lab-card">
+    <header>
+      <h2>Guided lab</h2>
+      <span class="note" id="lab-progress"></span>
+    </header>
+    <div class="body">
+      <ol class="lab-track" id="lab-track"></ol>
+      <div class="lab-main">
+        <h3 class="lab-title" id="lab-title"></h3>
+        <p class="lab-concept" id="lab-concept"></p>
+        <p class="lab-instruction" id="lab-instruction"></p>
+        <p class="lab-start" id="lab-start"></p>
+
+        <fieldset class="predict" id="lab-predict">
+          <legend id="lab-question"></legend>
+          <div class="predict-options" id="lab-options"></div>
+          <button type="button" class="primary" id="lab-lock" disabled>Apply the change</button>
+        </fieldset>
+
+        <!-- Announced rather than focused. The reveal is new content the reader
+             asked for, and moving focus would take them away from the console
+             they were told to watch. -->
+        <div class="lab-reveal" id="lab-reveal" hidden aria-live="polite">
+          <p class="lab-outcome" id="lab-outcome"></p>
+          <p class="lab-explain" id="lab-explain"></p>
+          <p class="lab-adversary" id="lab-adversary"></p>
+          <div class="lab-nav">
+            <button type="button" class="primary" id="lab-next">Next experiment</button>
+            <button type="button" class="ghost" id="lab-explore-here">Keep this state and explore</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
   <!-- ------------------------------------------------------------- control -->
   <div class="rail">
@@ -858,9 +1027,23 @@ const state = {
   adversaryKnowsTransport: false,
 };
 
+const DEFAULT_MSG1 = "Request immediate air support at grid 214 by 0600.";
+const DEFAULT_MSG2 = "Enemy armour massing north of the ridge line tonight.";
+
 let wasm = null;
 let last = null;
 let activeFrame = 0;
+
+/* The curriculum, from `codetalker_core::lab`. Presets, experiments, prediction
+   options and the switch ids they name — all of it data the crate ships and
+   tests/ablation.rs asserts against the real channel. */
+let LAB = null;
+let mode = "guided";
+let stepIndex = 0;
+let stage = "predict";
+let picked = null;
+let activePreset = null;
+let answered = new Map();
 
 const $ = (id) => document.getElementById(id);
 
@@ -880,9 +1063,14 @@ async function boot() {
     return;
   }
   $("console").hidden = false;
+  LAB = wasm.lab();
   buildBadges();
   buildControls();
-  run();
+  buildLab();
+
+  // A link is a configuration. Restoring it must beat the default first-run
+  // experience, or an instructor's link lands the class on experiment one.
+  if (!readHash()) enterStep(0);
 }
 
 /* The UI reads the module's capabilities rather than assuming them, so a
@@ -963,7 +1151,9 @@ function switchEl({ key, name, sub, impl, fault }) {
 
   input.addEventListener("change", (e) => {
     state[key] = e.target.checked;
-    run();
+    // Outline what moved, for a hand-thrown switch as much as for a guided one.
+    // Not the switch itself, though — the reader just touched it and knows.
+    run({ flashChanges: true });
   });
   return label;
 }
@@ -1029,6 +1219,329 @@ function buildControls() {
   }
 }
 
+/* --------------------------------------------------------- guided lab */
+
+/* The console shows thirty-two layer combinations at once, which is right for
+   exploring and wrong for arriving. This is the order: five experiments that
+   each move one thing, ask for a prediction first, and then say why the result
+   changed — or, in the first one, why it did not.
+   Every string below comes from `wasm.lab()`. None of it is authored here. */
+
+function buildLab() {
+  $("mode-guided").addEventListener("click", () => {
+    setMode("guided");
+    enterStep(stepIndex);
+  });
+  $("mode-explore").addEventListener("click", () => setMode("explore"));
+
+  const presets = $("presets");
+  for (const s of LAB.scenarios) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "preset";
+    b.dataset.preset = s.id;
+    b.textContent = s.name;
+    b.title = s.blurb;
+    b.setAttribute("aria-pressed", "false");
+    // A preset is a jump to a state, which abandons the guided sequence rather
+    // than advancing it. Saying so by switching mode is more honest than
+    // leaving a stale experiment on screen beside a configuration it no longer
+    // describes.
+    b.addEventListener("click", () => {
+      setMode("explore");
+      applySetup(s.setup);
+      run({ flashChanges: true });
+    });
+    presets.appendChild(b);
+  }
+
+  const track = $("lab-track");
+  LAB.steps.forEach((step, i) => {
+    const li = document.createElement("li");
+    const b = document.createElement("button");
+    b.type = "button";
+    b.innerHTML = `<span class="n"></span><span class="t"></span>`;
+    b.querySelector(".n").textContent = String(i + 1);
+    b.querySelector(".t").textContent = step.title;
+    b.addEventListener("click", () => enterStep(i));
+    li.appendChild(b);
+    track.appendChild(li);
+  });
+
+  const opts = $("lab-options");
+  for (const o of LAB.outcomes) {
+    const id = `pred-${o.tag}`;
+    const label = document.createElement("label");
+    label.innerHTML = `<input type="radio" name="prediction" id="${id}" /><span></span>`;
+    label.querySelector("span").textContent = o.label;
+    const input = label.querySelector("input");
+    input.value = o.tag;
+    input.addEventListener("change", () => {
+      picked = o.tag;
+      $("lab-lock").disabled = false;
+    });
+    opts.appendChild(label);
+  }
+
+  $("lab-lock").addEventListener("click", () => revealStep());
+  $("lab-next").addEventListener("click", () => {
+    if (stepIndex + 1 < LAB.steps.length) enterStep(stepIndex + 1);
+    else setMode("explore");
+  });
+  $("lab-explore-here").addEventListener("click", () => setMode("explore"));
+
+  $("reset").addEventListener("click", () => {
+    Object.assign(state, {
+      keyAgreement: true, aead: true, transport: true,
+      authenticate: true, ratchet: true, nonceReuse: false,
+      adversaryKnowsTransport: false,
+    });
+    $("msg1").value = DEFAULT_MSG1;
+    $("msg2").value = DEFAULT_MSG2;
+    $("suite").value = "aes";
+    answered.clear();
+    syncSwitches();
+    setMode("guided");
+    enterStep(0);
+  });
+
+  $("copy-link").addEventListener("click", async () => {
+    const btn = $("copy-link");
+    try {
+      await navigator.clipboard.writeText(location.href);
+      btn.textContent = "Copied";
+    } catch {
+      // Clipboard access is refused on insecure origins and by permission. The
+      // URL is in the address bar either way; say so rather than fail silently.
+      btn.textContent = "See address bar";
+    }
+    setTimeout(() => { btn.textContent = "Copy link"; }, 1600);
+  });
+
+  window.addEventListener("hashchange", () => readHash());
+}
+
+function setMode(m) {
+  mode = m;
+  $("mode-guided").setAttribute("aria-pressed", String(m === "guided"));
+  $("mode-explore").setAttribute("aria-pressed", String(m === "explore"));
+  $("lab-card").hidden = m !== "guided";
+  writeHash();
+}
+
+/* Write the console state onto the checkboxes. The switches are the reader's
+   view of `state`, and a preset that moved the model without moving them would
+   leave the page telling two different stories. */
+function syncSwitches() {
+  for (const key of LAB.switches) {
+    const input = document.querySelector(`.switch[data-key="${key}"] input`);
+    // Loud, because this is the failure mode `lab::SWITCHES` exists to prevent:
+    // a renamed control silently stops being highlighted during the one beat of
+    // the lesson that tells the reader where to look.
+    if (!input) { console.error(`lab names switch "${key}", which the page does not have`); continue; }
+    input.checked = !!state[key];
+  }
+}
+
+function applySetup(setup) {
+  for (const key of LAB.switches) if (key in setup) state[key] = setup[key];
+  const kem = setup.kem ?? null;
+  if (kem && [...$("backend").options].some((o) => o.value === kem)) $("backend").value = kem;
+  syncSwitches();
+}
+
+function enterStep(i, { reveal = false } = {}) {
+  stepIndex = i;
+  stage = "predict";
+  picked = null;
+  for (const el of document.querySelectorAll('input[name="prediction"]')) el.checked = false;
+  $("lab-lock").disabled = true;
+  applySetup(LAB.steps[i].before);
+  run();
+  if (reveal) revealStep({ score: false });
+  else renderLab();
+}
+
+function revealStep({ score = true } = {}) {
+  const step = LAB.steps[stepIndex];
+  stage = "reveal";
+  applySetup(step.after);
+  run({ flashChanges: true, moved: step.moves });
+  if (score) answered.set(step.id, picked === last.verdict);
+  renderLab();
+}
+
+function renderLab() {
+  const step = LAB.steps[stepIndex];
+  const right = [...answered.values()].filter(Boolean).length;
+  $("lab-progress").textContent =
+    `experiment ${stepIndex + 1} of ${LAB.steps.length}` +
+    (answered.size ? ` · ${right} of ${answered.size} predictions correct` : "");
+
+  [...$("lab-track").querySelectorAll("button")].forEach((b, i) => {
+    b.classList.toggle("done", answered.has(LAB.steps[i].id));
+    if (i === stepIndex) b.setAttribute("aria-current", "step");
+    else b.removeAttribute("aria-current");
+  });
+
+  $("lab-title").textContent = step.title;
+  $("lab-concept").textContent = step.concept;
+  $("lab-instruction").textContent = step.instruction;
+  $("lab-question").textContent = step.question;
+
+  const predicting = stage === "predict";
+  $("lab-predict").hidden = !predicting;
+  $("lab-reveal").hidden = predicting;
+  $("lab-start").textContent = predicting
+    ? "The console is already in this experiment's starting state. Predict first, then apply."
+    : "";
+  if (predicting) return;
+
+  // The prediction is scored against what the crate just produced, not against
+  // the step's declared expectation. They are asserted equal in
+  // tests/ablation.rs; checking the live value here means a divergence shows up
+  // as a divergence rather than as a reader marked wrong for being right.
+  const got = last.verdict;
+  const label = (tag) => (LAB.outcomes.find((o) => o.tag === tag) || { label: tag }).label;
+  const out = $("lab-outcome");
+  out.className = "lab-outcome";
+
+  if (got !== step.expectAfter) {
+    out.classList.add("drift");
+    out.textContent =
+      `This experiment expects ${label(step.expectAfter)} and the channel produced ` +
+      `${label(got)}. That is a defect in the demo, not in your prediction.`;
+  } else if (!picked) {
+    out.textContent = `The channel produced: ${label(got)}.`;
+  } else if (picked === got) {
+    out.classList.add("right");
+    out.textContent = `Correct — ${label(got)}.`;
+  } else {
+    out.classList.add("wrong");
+    out.textContent = `You predicted ${label(picked)}. The channel produced ${label(got)}.`;
+  }
+
+  $("lab-explain").textContent = step.explain;
+  $("lab-adversary").textContent = `Threat model: ${step.adversary}`;
+  $("lab-next").textContent =
+    stepIndex + 1 < LAB.steps.length ? "Next experiment" : "Finish — open the full console";
+}
+
+/* ----------------------------------------------------------- url state */
+
+/* A configuration is a link. An instructor can send one experiment, and a
+   reader can send back the exact state they are asking about, which is a more
+   useful thing to argue over than a screenshot. */
+
+let restoring = false;
+
+function writeHash() {
+  if (restoring || !LAB) return;
+  const p = new URLSearchParams();
+  p.set("m", mode === "guided" ? "g" : "e");
+  if (mode === "guided") {
+    p.set("s", String(stepIndex + 1));
+    p.set("st", stage === "reveal" ? "r" : "p");
+  }
+  p.set("c", LAYERS.map((l) => (state[l.key] ? "1" : "0")).join(""));
+  p.set("sp", state.adversaryKnowsTransport ? "1" : "0");
+  p.set("k", $("backend").value);
+  p.set("a", $("suite").value);
+  if ($("msg1").value !== DEFAULT_MSG1) p.set("m1", $("msg1").value);
+  if ($("msg2").value !== DEFAULT_MSG2) p.set("m2", $("msg2").value);
+  const next = "#" + p.toString();
+  // `replaceState`, not `location.hash`: the messages update on every keystroke
+  // and a history entry per character would make the back button useless.
+  if (next !== location.hash) history.replaceState(null, "", next);
+}
+
+function readHash() {
+  const raw = location.hash.replace(/^#/, "");
+  if (!raw) return false;
+  const p = new URLSearchParams(raw);
+
+  restoring = true;
+  const c = p.get("c");
+  if (c && c.length === LAYERS.length) {
+    LAYERS.forEach((l, i) => { state[l.key] = c[i] === "1"; });
+  }
+  if (p.has("sp")) state.adversaryKnowsTransport = p.get("sp") === "1";
+  const k = p.get("k");
+  if (k && [...$("backend").options].some((o) => o.value === k)) $("backend").value = k;
+  const a = p.get("a");
+  if (a === "aes" || a === "chacha") $("suite").value = a;
+  if (p.has("m1")) $("msg1").value = p.get("m1");
+  if (p.has("m2")) $("msg2").value = p.get("m2");
+  syncSwitches();
+
+  const guided = p.get("m") !== "e";
+  const n = parseInt(p.get("s") || "1", 10);
+  const i = Math.min(Math.max(Number.isFinite(n) ? n : 1, 1), LAB.steps.length) - 1;
+  restoring = false;
+
+  // In guided mode the *experiment* is the shared thing, so its own starting
+  // state wins over whatever `c` happens to say. In Explore the configuration
+  // is the shared thing. `m` is what disambiguates the two.
+  if (guided) {
+    setMode("guided");
+    enterStep(i, { reveal: p.get("st") === "r" });
+  } else {
+    setMode("explore");
+    run();
+  }
+  return true;
+}
+
+/* ------------------------------------------------------------- observe */
+
+/* "Something changed somewhere on a console this size" is not an observation.
+   These outline the values that actually moved. */
+
+function flash(el) {
+  if (!el) return;
+  el.classList.remove("flash");
+  void el.offsetWidth; // restart the animation rather than let it be ignored
+  el.classList.add("flash");
+  setTimeout(() => el.classList.remove("flash"), 1600);
+}
+
+function flashDiff(prev, next, moved) {
+  const targets = [];
+  for (const key of moved || []) {
+    targets.push(document.querySelector(`.switch[data-key="${key}"]`));
+  }
+  if (!prev || prev.verdict !== next.verdict) targets.push($("verdict"));
+  if (prev) {
+    for (const a of next.adversaries) {
+      const before = prev.adversaries.find((x) => x.id === a.id);
+      if (before && before.status !== a.status) {
+        targets.push(document.querySelector(`.threat-row[data-adv="${a.id}"]`));
+      }
+    }
+    if (prev.keysDiffer !== next.keysDiffer || prev.noncesDiffer !== next.noncesDiffer) {
+      targets.push($("keycmp"));
+    }
+    if (prev.frames[0].wireLen !== next.frames[0].wireLen) targets.push($("wire-meta"));
+  }
+  for (const el of targets) flash(el);
+}
+
+/* Which named scenario, if any, the console is currently sitting in. Derived
+   from the state rather than remembered from a click, so reaching a preset by
+   hand lights it up too. */
+function markPreset() {
+  const backend = $("backend").value;
+  const matches = LAB.scenarios.filter((s) =>
+    LAB.switches.every((k) => state[k] === s.setup[k]));
+  // A scenario that pins a KEM is the more specific description of the same
+  // switches, so it wins where both apply.
+  const pinned = matches.find((s) => (s.setup.kem ?? null) === backend);
+  activePreset = (pinned || matches.find((s) => !s.setup.kem) || null)?.id ?? null;
+  for (const b of document.querySelectorAll(".preset")) {
+    b.setAttribute("aria-pressed", String(b.dataset.preset === activePreset));
+  }
+}
+
 /* A switch that cannot do anything should say so rather than sit there
    looking operative. */
 function syncDependencies() {
@@ -1049,7 +1562,8 @@ function syncDependencies() {
 
 /* --------------------------------------------------------------- run */
 
-function run() {
+function run({ flashChanges = false, moved = null } = {}) {
+  const prev = last;
   syncDependencies();
   const cfg = {
     plaintext: $("msg1").value,
@@ -1083,6 +1597,9 @@ function run() {
   renderWire(result);
   renderReceiver(result);
   renderFacts(result, cfg);
+  markPreset();
+  writeHash();
+  if (flashChanges) flashDiff(prev, result, moved);
 }
 
 /* ----------------------------------------------------------- renders */
@@ -1145,6 +1662,8 @@ function renderThreats(r) {
   for (const a of r.adversaries) {
     const row = document.createElement("div");
     row.className = "threat-row";
+    // Addressable so the observe beat can outline the rows that actually moved.
+    row.dataset.adv = a.id;
     row.innerHTML =
       `<span class="threat-id"></span>` +
       `<span class="threat-label"></span>` +

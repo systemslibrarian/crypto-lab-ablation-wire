@@ -10,7 +10,7 @@
 
 use codetalker_core::session::{self, Recovery};
 use codetalker_core::threat;
-use codetalker_core::{aead, kem, transport};
+use codetalker_core::{aead, kem, lab, transport};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -225,44 +225,30 @@ pub fn transmit(config: JsValue) -> Result<JsValue, JsValue> {
         nonce_reuse: cfg.nonce_reuse,
     };
 
-    // With authentication off, the party on the other end is the attacker, and
-    // it got there by running a real handshake the victim could not distinguish
-    // from the genuine one.
-    let (mut sender, mut peer) = if layers.authenticate {
-        session::establish(&*k, layers, suite).map_err(js)?
-    } else {
-        session::establish_mitm(&*k, layers, suite).map_err(js)?
-    };
+    // The sequence itself — who the peer is, which of two attacks to report,
+    // whether the round trip succeeded — is `session::exchange`. It used to be
+    // written out here, where nothing tested it and where `lab`'s declared
+    // outcomes would have had to be checked against a second copy of it.
+    let ex = session::exchange(
+        &*k,
+        layers,
+        suite,
+        cfg.adversary_knows_transport,
+        cfg.plaintext.as_bytes(),
+        cfg.second_message.as_bytes(),
+    )
+    .map_err(js)?;
+    let sender = &ex.sender;
+    let [f1, f2] = &ex.frames;
+    let recovery = &ex.recovery;
+    let roundtrip = ex.roundtrip.clone();
 
-    let f1 = sender.send(layers, cfg.plaintext.as_bytes()).map_err(js)?;
-    let f2 = sender.send(layers, cfg.second_message.as_bytes()).map_err(js)?;
-
-    // The peer's decrypt and the attacker's are the same operation when the
-    // peer *is* the attacker, so it must not be run twice — the receiving chain
-    // advances on every call.
-    let (mitm, roundtrip) = if layers.authenticate {
-        (None, peer.recv(layers, &f1).ok())
-    } else {
-        let r = session::adversary_mitm(&mut peer, layers, &f1).map_err(js)?;
-        let pt = match &r {
-            Recovery::MachineInTheMiddle(p) => Some(p.clone()),
-            _ => None,
-        };
-        (Some(r), pt)
-    };
-
-    let passive = session::adversary(&sender, &f1, layers, cfg.adversary_knows_transport).map_err(js)?;
-
-    // Report the cheapest attack that works. A passive observer who already
-    // reads the traffic does not need to stand in the middle of it.
-    let recovery = match (&passive, mitm) {
-        (Recovery::MetadataOnly, Some(active)) => active,
-        _ => passive,
-    };
-
-    let (verdict, headline, detail, recovered) = match &recovery {
+    // `verdict` is `Recovery::tag()` and not a literal repeated here, because it
+    // is the vocabulary `lab` writes its expectations in and the page compares a
+    // reader's prediction against. Two spellings of it would be two things to
+    // keep in step.
+    let (headline, detail, recovered) = match recovery {
         Recovery::Plaintext(p) => (
-            "Plaintext",
             "Plaintext recovered.",
             "The layer that failed was not the one on the outside. Stripping the transport was \
              never the hard part; the key agreement and the AEAD underneath it were doing the \
@@ -270,14 +256,12 @@ pub fn transmit(config: JsValue) -> Result<JsValue, JsValue> {
             Some(String::from_utf8_lossy(p).to_string()),
         ),
         Recovery::KeystreamReuse(_) => (
-            "KeystreamReuse",
             "Nonce and key both repeated.",
             "One keystream encrypted two messages, so XORing the ciphertexts cancels it. A crib \
              for one message yields the other, as far as the crib reaches.",
             None,
         ),
         Recovery::MachineInTheMiddle(p) => (
-            "MachineInTheMiddle",
             "An attacker completed the handshake as the peer.",
             "The signature verified, because it was a valid signature — by the attacker. Without \
              a pinned identity key there is nothing to check it against, and both endpoints \
@@ -285,7 +269,6 @@ pub fn transmit(config: JsValue) -> Result<JsValue, JsValue> {
             Some(String::from_utf8_lossy(p).to_string()),
         ),
         Recovery::MetadataOnly => (
-            "MetadataOnly",
             "Length and timing only.",
             "Stripping the transport yields ciphertext, and ciphertext without the session key \
              yields nothing. This is the Kieyoomia result: a fluent speaker with no codebook \
@@ -306,10 +289,10 @@ pub fn transmit(config: JsValue) -> Result<JsValue, JsValue> {
         transcript_hash: hex::encode(sender.hs.transcript_hash),
         root_key: hex::encode(sender.hs.root),
         plaintext_len: cfg.plaintext.len(),
-        frames: vec![view(&f1, layers), view(&f2, layers)],
+        frames: vec![view(f1, layers), view(f2, layers)],
         roundtrip_ok: roundtrip.as_deref() == Some(cfg.plaintext.as_bytes()),
         roundtrip: roundtrip.map(|p| String::from_utf8_lossy(&p).to_string()),
-        verdict,
+        verdict: recovery.tag(),
         headline,
         detail,
         broken: recovery.is_broken(),
@@ -354,6 +337,126 @@ pub fn two_time_pad(ct1_hex: &str, ct2_hex: &str, crib: &str) -> Result<JsValue,
         complete: bounded_at >= target_len,
     })
     .map_err(js)
+}
+
+/* --------------------------------------------------------------------- lab */
+
+/// A console state, flattened to the switch ids the page uses. `camelCase`
+/// here is `lab::SWITCHES` — the page reads these keys straight onto its own
+/// controls, so the two lists agreeing is load-bearing rather than cosmetic.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SetupView {
+    pub key_agreement: bool,
+    pub aead: bool,
+    pub transport: bool,
+    pub authenticate: bool,
+    pub ratchet: bool,
+    pub nonce_reuse: bool,
+    pub adversary_knows_transport: bool,
+    /// `None` leaves the reader's selection alone.
+    pub kem: Option<String>,
+}
+
+fn setup_view(s: &lab::Setup) -> SetupView {
+    SetupView {
+        key_agreement: s.layers.key_agreement,
+        aead: s.layers.aead,
+        transport: s.layers.transport,
+        authenticate: s.layers.authenticate,
+        ratchet: s.layers.ratchet,
+        nonce_reuse: s.layers.nonce_reuse,
+        adversary_knows_transport: s.adversary_knows_transport,
+        kem: s.kem.map(str::to_string),
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScenarioView {
+    pub id: String,
+    pub name: String,
+    pub blurb: String,
+    pub setup: SetupView,
+    pub expect: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StepView {
+    pub id: String,
+    pub title: String,
+    pub concept: String,
+    pub before: SetupView,
+    pub after: SetupView,
+    pub instruction: String,
+    pub moves: Vec<String>,
+    pub question: String,
+    pub expect_before: String,
+    pub expect_after: String,
+    pub explain: String,
+    pub adversary: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OutcomeView {
+    pub tag: String,
+    pub label: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Lab {
+    pub outcomes: Vec<OutcomeView>,
+    pub scenarios: Vec<ScenarioView>,
+    pub steps: Vec<StepView>,
+    pub switches: Vec<String>,
+}
+
+/// The guided sequence and the presets, as data.
+///
+/// The page renders this; it authors none of it. A lesson written in HTML would
+/// be the one panel on the screen that nothing verifies — `tests/ablation.rs`
+/// runs every step and every preset through the real channel and asserts the
+/// outcome each one declares here.
+#[wasm_bindgen]
+pub fn lab() -> Result<JsValue, JsValue> {
+    let out = Lab {
+        outcomes: lab::OUTCOMES
+            .iter()
+            .map(|o| OutcomeView { tag: o.tag.to_string(), label: o.label.to_string() })
+            .collect(),
+        scenarios: lab::SCENARIOS
+            .iter()
+            .map(|s| ScenarioView {
+                id: s.id.to_string(),
+                name: s.name.to_string(),
+                blurb: s.blurb.to_string(),
+                setup: setup_view(&s.setup),
+                expect: s.expect.to_string(),
+            })
+            .collect(),
+        steps: lab::STEPS
+            .iter()
+            .map(|s| StepView {
+                id: s.id.to_string(),
+                title: s.title.to_string(),
+                concept: s.concept.to_string(),
+                before: setup_view(&s.before),
+                after: setup_view(&s.after),
+                instruction: s.instruction.to_string(),
+                moves: s.moves.iter().map(|m| m.to_string()).collect(),
+                question: s.question.to_string(),
+                expect_before: s.expect_before.to_string(),
+                expect_after: s.expect_after.to_string(),
+                explain: s.explain.to_string(),
+                adversary: s.adversary.to_string(),
+            })
+            .collect(),
+        switches: lab::SWITCHES.iter().map(|s| s.to_string()).collect(),
+    };
+    serde_wasm_bindgen::to_value(&out).map_err(js)
 }
 
 /// Which KEM backends this build actually contains. The UI reads this rather
