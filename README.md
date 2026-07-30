@@ -237,7 +237,7 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | `check-artifact.sh` | every relative reference resolves inside `web/` |
 | `cargo fuzz deobfuscate` | 45,027,157 executions, no crashes |
 | `cargo fuzz identity_verify` | 577,993 classical + 608,145 with `pq`, no crashes |
-| Scheduled fuzzing | nightly, 20 min per target, **against a corpus cached between runs** |
+| Scheduled fuzzing | nightly, 20 min per target, against a corpus cached between runs — demonstrated: the second run restored 169 seeds and libFuzzer reported them |
 | Line coverage | **83.36%** (81.30% region, 80.00% function), floored at 80% in CI |
 | Build provenance | the published wasm module is signed; `gh attestation verify` checks it |
 | Module size | 706 kB, budgeted at 900 kB by `check-artifact.sh` |
@@ -320,6 +320,11 @@ mutated further. So the sentence was made true rather than deleted —
 corpus through a rolling cache key and minimising it with `cargo fuzz cmin`
 before each save so it does not grow into replay. A fixed cache key would have
 been the same bug in a new place: restored once, then frozen.
+
+Demonstrated rather than assumed, by dispatching it twice: the first run started
+from nothing and saved, the second restored that cache and entered with 169
+seeds, with libFuzzer confirming `seed corpus: files: 169`. A workflow that has
+never run is the same category of claim as the sentence it replaced.
 
 ## Documents
 
