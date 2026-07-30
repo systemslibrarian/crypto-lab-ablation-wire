@@ -405,13 +405,76 @@ pub struct OutcomeView {
     pub label: String,
 }
 
+/// A challenge, minus its solution.
+///
+/// `lab::Challenge::solution` is deliberately not on this struct. It exists so
+/// the crate's tests can prove the task is solvable; shipping it to the browser
+/// would put the answer in the DOM of the page setting the question.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ChallengeView {
+    pub id: String,
+    pub title: String,
+    pub brief: String,
+    pub requirements: Vec<String>,
+    pub question: String,
+    pub answer: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Scorecard {
+    /// One flag per requirement, in order. A checklist rather than a verdict:
+    /// someone three conditions into a four-condition goal needs to know which
+    /// one is missing.
+    pub met: Vec<bool>,
+    pub solved: bool,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Lab {
     pub outcomes: Vec<OutcomeView>,
     pub scenarios: Vec<ScenarioView>,
     pub steps: Vec<StepView>,
+    pub challenges: Vec<ChallengeView>,
     pub switches: Vec<String>,
+}
+
+/// Score the live configuration against one challenge, condition by condition.
+#[wasm_bindgen]
+pub fn check_challenge(id: &str, config: JsValue) -> Result<JsValue, JsValue> {
+    let cfg: Config = serde_wasm_bindgen::from_value(config).map_err(js)?;
+    let ch = lab::CHALLENGES
+        .iter()
+        .find(|c| c.id == id)
+        .ok_or_else(|| js(format!("no challenge {id}")))?;
+    let k = kem::backend(&cfg.backend).map_err(js)?;
+
+    let setup = lab::Setup {
+        layers: session::Layers {
+            key_agreement: cfg.key_agreement,
+            aead: cfg.aead,
+            transport: cfg.transport,
+            authenticate: cfg.authenticate,
+            ratchet: cfg.ratchet,
+            nonce_reuse: cfg.nonce_reuse,
+        },
+        adversary_knows_transport: cfg.adversary_knows_transport,
+        kem: None,
+    };
+
+    let met = lab::evaluate(
+        ch,
+        &*k,
+        setup,
+        suite_of(&cfg.suite),
+        cfg.plaintext.as_bytes(),
+        cfg.second_message.as_bytes(),
+    )
+    .map_err(js)?;
+    let solved = met.iter().all(|m| *m);
+    serde_wasm_bindgen::to_value(&Scorecard { met, solved }).map_err(js)
 }
 
 /// The guided sequence and the presets, as data.
@@ -452,6 +515,21 @@ pub fn lab() -> Result<JsValue, JsValue> {
                 expect_after: s.expect_after.to_string(),
                 explain: s.explain.to_string(),
                 adversary: s.adversary.to_string(),
+            })
+            .collect(),
+        // Withheld rather than shown-and-unsolvable: a challenge requiring a
+        // backend this build does not contain would tick four conditions and
+        // never the fifth, for a reason invisible from the console.
+        challenges: lab::CHALLENGES
+            .iter()
+            .filter(|c| c.needs_backend.is_none_or(|n| kem::backend(n).is_ok()))
+            .map(|c| ChallengeView {
+                id: c.id.to_string(),
+                title: c.title.to_string(),
+                brief: c.brief.to_string(),
+                requirements: c.requirements.iter().map(|r| r.label().to_string()).collect(),
+                question: c.question.to_string(),
+                answer: c.answer.to_string(),
             })
             .collect(),
         switches: lab::SWITCHES.iter().map(|s| s.to_string()).collect(),

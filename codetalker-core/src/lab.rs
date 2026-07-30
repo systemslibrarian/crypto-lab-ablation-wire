@@ -343,3 +343,248 @@ pub const STEPS: [Step; 5] = [
         adversary: "A1 defended, A3 defended",
     },
 ];
+
+// ---------------------------------------------------------------------------
+// Transfer challenges: a goal, not a recipe.
+// ---------------------------------------------------------------------------
+
+/// One condition a challenge configuration has to meet.
+///
+/// Data rather than a closure, because the page has to *render* the checklist —
+/// a reader working on a goal needs to see which conditions they have already
+/// met and which they have not, and a boolean-returning function can only tell
+/// them they are wrong.
+#[derive(Debug, Clone, Copy)]
+pub enum Requirement {
+    /// A named adversary must end up in this status.
+    Adversary {
+        id: &'static str,
+        status: &'static str,
+        label: &'static str,
+    },
+    /// The KEM *in force* must (or must not) be post-quantum.
+    PostQuantum { yes: bool, label: &'static str },
+    /// A console switch must be in this position.
+    Switch {
+        id: &'static str,
+        on: bool,
+        label: &'static str,
+    },
+    /// The recovery verdict, by [`Recovery::tag`](crate::session::Recovery::tag).
+    Verdict { tag: &'static str, label: &'static str },
+    /// Every switch left on must be load-bearing: turning any one of them off
+    /// has to change the verdict. This is what makes "the smallest
+    /// configuration" a checkable claim rather than a matter of opinion.
+    Minimal { label: &'static str },
+}
+
+impl Requirement {
+    pub fn label(&self) -> &'static str {
+        match self {
+            Requirement::Adversary { label, .. }
+            | Requirement::PostQuantum { label, .. }
+            | Requirement::Switch { label, .. }
+            | Requirement::Verdict { label, .. }
+            | Requirement::Minimal { label } => label,
+        }
+    }
+}
+
+/// A task stated as an outcome, with the reasoning left to the reader.
+///
+/// The five experiments test whether someone can follow a tour. These test
+/// whether they can build a configuration nobody showed them, which is a
+/// different and harder thing — and the one that says whether the model
+/// transferred.
+#[derive(Debug, Clone, Copy)]
+pub struct Challenge {
+    pub id: &'static str,
+    pub title: &'static str,
+    pub brief: &'static str,
+    pub requirements: &'static [Requirement],
+    /// Asked once the configuration validates. Configuring it is half the task;
+    /// this is the half that distinguishes understanding from switch-flipping.
+    pub question: &'static str,
+    /// What a correct answer says, revealed for self-checking. Free text cannot
+    /// be graded here and pretending otherwise would be worse than not trying.
+    pub answer: &'static str,
+    /// A configuration meeting every requirement. Asserted, so a challenge
+    /// cannot ship unsolvable.
+    pub solution: Setup,
+    /// A KEM backend this challenge cannot be attempted without.
+    ///
+    /// Only set where the task is *about* the KEM. A build compiled
+    /// `--no-default-features --features pq` has no classical backend at all, so
+    /// "use classical primitives only" is not a hard task there, it is an
+    /// impossible one — and a console that offers an unsolvable goal teaches a
+    /// reader to distrust the checklist.
+    pub needs_backend: Option<&'static str>,
+}
+
+pub const CHALLENGES: [Challenge; 2] = [
+    Challenge {
+        id: "hold-the-line",
+        title: "Hold the line, and know what you gave up",
+        brief: "Configure the channel so that both a passive observer and an active \
+                machine-in-the-middle fail, using classical primitives only, and \
+                deliberately without forward secrecy.",
+        requirements: &[
+            Requirement::Adversary {
+                id: "A1",
+                status: "defended",
+                label: "A passive observer recovers nothing",
+            },
+            Requirement::Adversary {
+                id: "A2",
+                status: "defended",
+                label: "An active attacker cannot become the peer",
+            },
+            Requirement::PostQuantum {
+                yes: false,
+                label: "Classical primitives only — the KEM in force is not post-quantum",
+            },
+            Requirement::Switch {
+                id: "ratchet",
+                on: false,
+                label: "No forward secrecy — the ratchet is off",
+            },
+        ],
+        question: "Two adversaries still win here. Name them, and say what each one gets.",
+        answer: "A3 and A4, and they are different kinds of loss. A3 is a key compromise at \
+                 some future time T: with no ratchet, one key covers every message the session \
+                 ever sent, so a single compromise opens the whole archive rather than one \
+                 message. A4 is a quantum adversary who does not need access today at all — \
+                 X25519 traffic recorded now falls whenever the discrete log does, which is why \
+                 harvest-now-decrypt-later is a deadline and not a threat. Neither shows up in \
+                 the verdict, which is the point: the recovery panel says what an attacker gets \
+                 today, and these are both statements about later.",
+        solution: pre_quantum(no_ratchet(full())),
+        needs_backend: Some("x25519"),
+    },
+    Challenge {
+        id: "smallest-pad",
+        title: "The smallest two-time pad",
+        brief: "Build the smallest configuration in which repeating the nonce lets an \
+                adversary recover message 2 from a crib for message 1. Every switch you leave \
+                on has to be necessary: if one of them can be switched off without changing \
+                the result, the configuration is not the smallest.",
+        requirements: &[
+            Requirement::Verdict {
+                tag: "KeystreamReuse",
+                label: "The adversary recovers message 2 from a crib for message 1",
+            },
+            Requirement::Minimal {
+                label: "Every switch left on is load-bearing — turning any one off changes the result",
+            },
+        ],
+        question: "Why does each condition you kept have to be there? Key agreement in \
+                   particular: why does switching it off make the result worse rather than \
+                   better?",
+        answer: "Key agreement has to stay on, and that is the counterintuitive one. Switch it \
+                 off and the adversary stops needing the two-time pad at all — they rebuild the \
+                 key from a transcript that crossed the wire in the clear and read both \
+                 messages directly. That is a bigger break and a completely different lesson, so \
+                 a configuration that produces it is not a smaller answer to this question but a \
+                 wrong one. AEAD has to stay on for the same reason: with nothing encrypted \
+                 there is no keystream to reuse. The ratchet has to be off, because a fresh key \
+                 per message means the two frames share a nonce and nothing else. And \
+                 authentication has to be off — not because it would prevent the attack, but \
+                 because it does nothing against it, and a switch that changes no result is \
+                 exactly what \"smallest\" excludes.",
+        solution: Setup {
+            layers: Layers {
+                key_agreement: true,
+                aead: true,
+                transport: false,
+                authenticate: false,
+                ratchet: false,
+                nonce_reuse: true,
+            },
+            adversary_knows_transport: false,
+            kem: None,
+        },
+        needs_backend: None,
+    },
+];
+
+/// Score a configuration against a challenge, condition by condition.
+///
+/// Returns one flag per requirement, in order, so the page can show a checklist
+/// rather than a pass/fail. Someone three conditions into a four-condition goal
+/// needs to know which one is missing.
+pub fn evaluate(
+    ch: &Challenge,
+    kem: &dyn crate::kem::Kem,
+    setup: Setup,
+    suite: crate::aead::Suite,
+    m1: &[u8],
+    m2: &[u8],
+) -> crate::error::Result<Vec<bool>> {
+    let run = |s: Setup| -> crate::error::Result<crate::session::Exchange> {
+        crate::session::exchange(kem, s.layers, suite, s.adversary_knows_transport, m1, m2)
+    };
+    let ex = run(setup)?;
+    let verdict = ex.recovery.tag();
+    // The KEM *in force*, not the one selected: with key agreement off the
+    // harness substitutes a static backend, and crediting the reader with a
+    // post-quantum property the channel does not have would make the checklist
+    // lie in the reader's favour.
+    let kem_is_pq = ex.sender.hs.kem_is_pq;
+    let adversaries = crate::threat::assess(setup.layers, kem_is_pq);
+
+    let mut out = Vec::with_capacity(ch.requirements.len());
+    for req in ch.requirements {
+        out.push(match req {
+            Requirement::Adversary { id, status, .. } => adversaries
+                .iter()
+                .any(|a| a.id == *id && a.status.as_str() == *status),
+            Requirement::PostQuantum { yes, .. } => kem_is_pq == *yes,
+            Requirement::Switch { id, on, .. } => switch_of(&setup, id) == Some(*on),
+            Requirement::Verdict { tag, .. } => verdict == *tag,
+            Requirement::Minimal { .. } => {
+                let mut minimal = true;
+                for id in SWITCHES {
+                    // The injected fault is the premise of the task, not a layer
+                    // whose necessity is in question.
+                    if id == "nonceReuse" || switch_of(&setup, id) != Some(true) {
+                        continue;
+                    }
+                    let mut without = setup;
+                    set_switch(&mut without, id, false);
+                    if run(without)?.recovery.tag() == verdict {
+                        minimal = false;
+                        break;
+                    }
+                }
+                minimal
+            }
+        });
+    }
+    Ok(out)
+}
+
+fn switch_of(s: &Setup, id: &str) -> Option<bool> {
+    Some(match id {
+        "keyAgreement" => s.layers.key_agreement,
+        "aead" => s.layers.aead,
+        "transport" => s.layers.transport,
+        "authenticate" => s.layers.authenticate,
+        "ratchet" => s.layers.ratchet,
+        "nonceReuse" => s.layers.nonce_reuse,
+        "adversaryKnowsTransport" => s.adversary_knows_transport,
+        _ => return None,
+    })
+}
+
+fn set_switch(s: &mut Setup, id: &str, on: bool) {
+    match id {
+        "keyAgreement" => s.layers.key_agreement = on,
+        "aead" => s.layers.aead = on,
+        "transport" => s.layers.transport = on,
+        "authenticate" => s.layers.authenticate = on,
+        "ratchet" => s.layers.ratchet = on,
+        "nonceReuse" => s.layers.nonce_reuse = on,
+        "adversaryKnowsTransport" => s.adversary_knows_transport = on,
+        _ => {}
+    }
+}

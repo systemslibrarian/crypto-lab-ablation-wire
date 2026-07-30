@@ -1035,3 +1035,196 @@ fn the_unauthenticated_handshake_names_the_attacker_as_the_peer() {
         assert!(!b.message.is_empty() && b.note.len() > 20);
     }
 }
+
+// ---------------------------------------------------------------------------
+// The transfer challenges. A goal is only a goal if it is reachable, and only
+// a test if it can be failed.
+// ---------------------------------------------------------------------------
+
+/// The KEM to score a challenge under: the one it needs when it names one, and
+/// otherwise whatever this build has. Ignoring `needs_backend` would score the
+/// classical challenge against X-Wing and call it unsolvable.
+fn challenge_kem(ch: &lab::Challenge) -> Option<Box<dyn Kem>> {
+    match ch.needs_backend {
+        Some(name) => kem::backend(name).ok(),
+        None => Some(k()),
+    }
+}
+
+fn score(ch: &lab::Challenge, setup: lab::Setup) -> Vec<bool> {
+    let kem = challenge_kem(ch).expect("caller checked the backend resolves");
+    lab::evaluate(
+        ch,
+        &*kem,
+        setup,
+        SUITE,
+        b"Request immediate air support at grid 214 by 0600.",
+        b"Enemy armour massing north of the ridge line tonight.",
+    )
+    .expect("a challenge setup must be one the channel can run")
+}
+
+#[test]
+fn every_challenge_is_solvable_by_its_own_solution() {
+    for ch in lab::CHALLENGES {
+        // A challenge naming a backend this build does not contain is not
+        // solvable here and must say so rather than be quietly skipped: the
+        // declaration is what lets `lab()` withhold it from the page.
+        if challenge_kem(&ch).is_none() {
+            assert!(ch.needs_backend.is_some());
+            continue;
+        }
+        let got = score(&ch, ch.solution);
+        assert_eq!(got.len(), ch.requirements.len());
+        for (met, req) in got.iter().zip(ch.requirements) {
+            assert!(*met, "{}: the published solution fails {:?}", ch.id, req.label());
+        }
+    }
+}
+
+/// The other half. A checklist that cannot fail is decoration, so each
+/// challenge is scored against a configuration that is wrong in a specific,
+/// plausible way — the way a reader would actually get it wrong.
+#[test]
+fn every_challenge_rejects_the_near_miss_a_reader_would_actually_make() {
+    let hold = lab::CHALLENGES.iter().find(|c| c.id == "hold-the-line").unwrap();
+    if challenge_kem(hold).is_none() {
+        return; // no classical backend in this build; covered by the test above
+    }
+
+    // The whole stack, correct in every respect except that it kept forward
+    // secrecy the brief asked to give up.
+    let kept_the_ratchet = lab::Setup { kem: Some("x25519"), ..hold.solution };
+    let mut with_ratchet = kept_the_ratchet;
+    with_ratchet.layers.ratchet = true;
+    let got = score(hold, with_ratchet);
+    assert!(
+        got[..3].iter().all(|m| *m),
+        "the first three conditions still hold"
+    );
+    assert!(
+        !got[3],
+        "leaving the ratchet on must fail the forward-secrecy condition"
+    );
+
+    // ...and dropping authentication loses A2 while everything else stands.
+    let mut unauthenticated = hold.solution;
+    unauthenticated.layers.authenticate = false;
+    let got = score(hold, unauthenticated);
+    assert!(got[0], "A1 is unaffected by authentication");
+    assert!(!got[1], "A2 must fail with no pinned peer");
+
+    let pad = lab::CHALLENGES.iter().find(|c| c.id == "smallest-pad").unwrap();
+
+    // The verdict is right and the configuration is not the smallest: the
+    // transport layer is carrying nothing here, and switching it off leaves the
+    // result exactly where it was.
+    let mut padded = pad.solution;
+    padded.layers.transport = true;
+    padded.adversary_knows_transport = true;
+    let got = score(pad, padded);
+    assert!(got[0], "the two-time pad still lands");
+    assert!(!got[1], "a switch that changes no result must fail minimality");
+
+    // Switching key agreement off looks like a smaller answer and is a wrong
+    // one: the adversary stops needing the pad and reads the plaintext outright.
+    let mut no_agreement = pad.solution;
+    no_agreement.layers.key_agreement = false;
+    let got = score(pad, no_agreement);
+    assert!(!got[0], "removing key agreement changes the attack, not its size");
+}
+
+/// The minimality condition is the load-bearing idea in the second challenge,
+/// so it is asserted directly rather than only through a solution that happens
+/// to satisfy it: every switch left on in the published answer must be one whose
+/// removal changes the verdict.
+#[test]
+fn the_published_smallest_configuration_really_is_minimal() {
+    let pad = lab::CHALLENGES.iter().find(|c| c.id == "smallest-pad").unwrap();
+    assert_eq!(outcome(pad.solution), "KeystreamReuse");
+
+    for id in lab::SWITCHES {
+        if id == "nonceReuse" {
+            continue;
+        }
+        let mut s = pad.solution;
+        let was = match id {
+            "keyAgreement" => std::mem::replace(&mut s.layers.key_agreement, false),
+            "aead" => std::mem::replace(&mut s.layers.aead, false),
+            "transport" => std::mem::replace(&mut s.layers.transport, false),
+            "authenticate" => std::mem::replace(&mut s.layers.authenticate, false),
+            "ratchet" => std::mem::replace(&mut s.layers.ratchet, false),
+            _ => std::mem::replace(&mut s.adversary_knows_transport, false),
+        };
+        if !was {
+            continue;
+        }
+        assert_ne!(
+            outcome(s),
+            "KeystreamReuse",
+            "{id} is on in the smallest configuration and does nothing"
+        );
+    }
+}
+
+/// Whatever the feature set, a reader must be left with something to attempt.
+#[test]
+fn at_least_one_challenge_is_attemptable_in_every_build() {
+    assert!(
+        lab::CHALLENGES.iter().any(|c| challenge_kem(c).is_some()),
+        "this build offers no solvable transfer challenge"
+    );
+}
+
+#[test]
+fn every_challenge_asks_a_question_and_answers_it() {
+    for ch in lab::CHALLENGES {
+        assert!(ch.brief.len() > 80, "{}: the goal needs stating", ch.id);
+        assert!(ch.question.len() > 40, "{}: no question asked", ch.id);
+        // The answer is what a reader checks themselves against, so it has to be
+        // an explanation and not a restatement of the goal.
+        assert!(ch.answer.len() > 200, "{}: the answer explains too little", ch.id);
+        assert!(!ch.requirements.is_empty());
+        for r in ch.requirements {
+            assert!(r.label().len() > 20, "{}: a condition with no label", ch.id);
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// TEACHING.md. Same rule as THREAT_MODEL.md: a published table that states
+// outcomes is a claim, and claims get asserted.
+// ---------------------------------------------------------------------------
+
+#[test]
+fn the_instructor_guide_reports_the_outcome_each_preset_actually_produces() {
+    let guide = include_str!("../../TEACHING.md");
+    for s in lab::SCENARIOS {
+        // Rows read: | Name | ... | `Verdict` | ...
+        let row = guide
+            .lines()
+            .find(|l| l.starts_with(&format!("| {} |", s.name)))
+            .unwrap_or_else(|| panic!("TEACHING.md has no row for the {} preset", s.name));
+        assert!(
+            row.contains(&format!("`{}`", s.expect)),
+            "TEACHING.md says something other than {} for {}:\n{row}",
+            s.expect,
+            s.name
+        );
+    }
+}
+
+#[test]
+fn the_instructor_guide_covers_every_experiment_and_challenge() {
+    let guide = include_str!("../../TEACHING.md");
+    for step in lab::STEPS {
+        assert!(
+            guide.contains(step.title),
+            "TEACHING.md skips experiment {}",
+            step.id
+        );
+    }
+    for ch in lab::CHALLENGES {
+        assert!(guide.contains(ch.title), "TEACHING.md skips challenge {}", ch.id);
+    }
+}

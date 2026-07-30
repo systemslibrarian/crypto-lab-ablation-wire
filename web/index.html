@@ -37,11 +37,18 @@
   --line-soft: #e7ebf2;
   --ink: #171b22;
   --ink-2: #454e5e;
-  --ink-3: #6d7789;
+  /* 4.49:1 on --panel and 4.31:1 on --panel-2 at #6d7789 -- both just under AA,
+     which is the least useful place for a colour to sit. */
+  --ink-3: #656e7d;
 
   --accent: #4c7bb8;
   --accent-ink: #2f5d96;
   --accent-wash: #e8f0f9;
+  /* A filled button needs its own pair. White on --accent measures 4.35:1 in
+     this theme and 2.56:1 in the dark one -- both under AA, and both on the
+     primary action. The fill goes darker here and the ink goes dark there. */
+  --btn-fill: #2f5d96;
+  --btn-ink: #ffffff;
 
   /* Semantic, and deliberately not the accent. */
   --ok: #2f8f6f;
@@ -50,6 +57,11 @@
   --bad-wash: #fbe9e7;
   --warn: #b8863b;
   --warn-wash: #f9f0e0;
+  /* Same hue, enough darker to clear 4.5:1 against its own wash. Used wherever
+     a semantic colour carries *text* rather than a border or a fill. */
+  --ok-ink: #1e6b52;
+  --bad-ink: #a5342b;
+  --warn-ink: #855e1d;
 
   --hex-framing: #7a6ea8;
   --hex-length: #4c7bb8;
@@ -82,11 +94,14 @@
     --line-soft: #262d39;
     --ink: #e7ecf4;
     --ink-2: #a8b3c4;
-    --ink-3: #7b8699;
+    /* 4.11:1 on --panel-2 at #7b8699. Same fix, other direction. */
+    --ink-3: #8b95a6;
 
     --accent: #7aa5d9;
     --accent-ink: #9dc0ea;
     --accent-wash: #1c2735;
+    --btn-fill: #7aa5d9;
+    --btn-ink: #10141a;
 
     --ok: #4fb894;
     --ok-wash: #16281f;
@@ -94,6 +109,11 @@
     --bad-wash: #2c1a19;
     --warn: #d4a355;
     --warn-wash: #2a2216;
+    /* The dark washes are dark enough that the fill colours already clear AA
+       as text, so these are the same value rather than a second palette. */
+    --ok-ink: #4fb894;
+    --bad-ink: #e2695c;
+    --warn-ink: #d4a355;
 
     --hex-framing: #a99ad8;
     --hex-length: #7aa5d9;
@@ -111,18 +131,19 @@
 :root[data-theme="light"] {
   --ground: #f7f8fa; --panel: #ffffff; --panel-2: #eef1f6;
   --line: #d8dee8; --line-soft: #e7ebf2;
-  --ink: #171b22; --ink-2: #454e5e; --ink-3: #6d7789;
+  --ink: #171b22; --ink-2: #454e5e; --ink-3: #656e7d;
   --accent: #4c7bb8; --accent-ink: #2f5d96; --accent-wash: #e8f0f9;
-  --ok: #2f8f6f; --ok-wash: #e4f2ec;
-  --bad: #c4453a; --bad-wash: #fbe9e7;
-  --warn: #b8863b; --warn-wash: #f9f0e0;
+  --btn-fill: #2f5d96; --btn-ink: #ffffff;
+  --ok: #2f8f6f; --ok-wash: #e4f2ec; --ok-ink: #1e6b52;
+  --bad: #c4453a; --bad-wash: #fbe9e7; --bad-ink: #a5342b;
+  --warn: #b8863b; --warn-wash: #f9f0e0; --warn-ink: #855e1d;
   --hex-framing: #7a6ea8; --hex-length: #4c7bb8; --hex-ct: #454e5e;
   --hex-tag: #b8863b; --hex-pad: #b6bfcd; --hex-pt: #c4453a;
 }
 :root[data-theme="dark"] {
   --ground: #12151b; --panel: #191d25; --panel-2: #212734;
   --line: #2f3745; --line-soft: #262d39;
-  --ink: #e7ecf4; --ink-2: #a8b3c4; --ink-3: #7b8699;
+  --ink: #e7ecf4; --ink-2: #a8b3c4; --ink-3: #8b95a6;
   --accent: #7aa5d9; --accent-ink: #9dc0ea; --accent-wash: #1c2735;
   --ok: #4fb894; --ok-wash: #16281f;
   --bad: #e2695c; --bad-wash: #2c1a19;
@@ -183,7 +204,7 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
   border: 1px solid var(--line); background: var(--panel-2); color: var(--ink-2);
   white-space: nowrap;
 }
-.badge.on { border-color: var(--ok); color: var(--ok); background: var(--ok-wash); }
+.badge.on { border-color: var(--ok); color: var(--ok-ink); background: var(--ok-wash); }
 .badge.off { border-color: var(--line); color: var(--ink-3); }
 
 /* ------------------------------------------------------------------ layout */
@@ -284,7 +305,7 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
 .switch-name { font-size: var(--fs-sm); font-weight: 600; display: block; }
 .switch-sub { font-size: var(--fs-xs); color: var(--ink-3); display: block; }
 .switch-sub .mono { color: var(--ink-2); }
-.switch-why { font-size: var(--fs-xs); color: var(--warn); display: none; margin-top: 0.15rem; }
+.switch-why { font-size: var(--fs-xs); color: var(--warn-ink); display: none; margin-top: 0.15rem; }
 .switch.disabled .switch-why { display: block; }
 
 /* The Kieyoomia control is the claim the whole page is built around, so it
@@ -298,6 +319,9 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
 }
 .kieyoomia .switch:hover { background: transparent; }
 .kieyoomia p { margin: 0.5rem 0 0; font-size: var(--fs-xs); color: var(--ink-2); }
+/* The accent wash is lighter than the panel, so the muted ink loses its margin
+   on it and needs the next step up. */
+.kieyoomia .switch-sub { color: var(--ink-2); }
 
 /* ----------------------------------------------------------------- verdict */
 
@@ -311,8 +335,8 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
   padding: 0.2rem 0.5rem; border-radius: 3px;
   background: var(--panel-2); color: var(--ink-2); border: 1px solid var(--line);
 }
-.state-ok .verdict-tag { background: var(--ok-wash); color: var(--ok); border-color: var(--ok); }
-.state-bad .verdict-tag { background: var(--bad-wash); color: var(--bad); border-color: var(--bad); }
+.state-ok .verdict-tag { background: var(--ok-wash); color: var(--ok-ink); border-color: var(--ok); }
+.state-bad .verdict-tag { background: var(--bad-wash); color: var(--bad-ink); border-color: var(--bad); }
 .verdict-headline { font-family: var(--serif); font-size: var(--fs-lg); letter-spacing: -0.01em; }
 .verdict-detail { margin: 0; color: var(--ink-2); max-width: 68ch; }
 
@@ -320,7 +344,7 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
   border: 1px solid var(--bad); background: var(--bad-wash);
   border-radius: 4px; padding: 0.6rem 0.75rem;
 }
-.recovered-box .eyebrow { color: var(--bad); }
+.recovered-box .eyebrow { color: var(--bad-ink); }
 .recovered-text {
   font-family: var(--mono); font-size: var(--fs-sm);
   margin-top: 0.3rem; word-break: break-word; white-space: pre-wrap; color: var(--ink);
@@ -390,7 +414,7 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
 .pad-val { font-family: var(--mono); font-size: var(--fs-sm); word-break: break-word; white-space: pre-wrap; }
 .pad-recovered { color: var(--bad); font-weight: 600; }
 .pad-lost { color: var(--ink-3); }
-.bound-note { font-size: var(--fs-xs); color: var(--warn); margin-top: 0.5rem; }
+.bound-note { font-size: var(--fs-xs); color: var(--warn-ink); margin-top: 0.5rem; }
 
 /* ------------------------------------------------------------------ history */
 
@@ -418,11 +442,11 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
   padding: 0.1rem 0.5rem; border-radius: 999px; border: 1px solid;
 }
 .threat-status::before { margin-right: 0.35rem; font-weight: 700; }
-.st-defended { color: var(--ok); border-color: var(--ok); background: var(--ok-wash); }
+.st-defended { color: var(--ok-ink); border-color: var(--ok); background: var(--ok-wash); }
 .st-defended::before { content: "\2713"; }
-.st-exposed { color: var(--bad); border-color: var(--bad); background: var(--bad-wash); }
+.st-exposed { color: var(--bad-ink); border-color: var(--bad); background: var(--bad-wash); }
 .st-exposed::before { content: "\2717"; }
-.st-out-of-scope { color: var(--ink-3); border-color: var(--line); background: var(--panel-2); }
+.st-out-of-scope { color: var(--ink-2); border-color: var(--line); background: var(--panel-2); }
 .st-out-of-scope::before { content: "\2014"; }
 
 .leak-row {
@@ -442,8 +466,8 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
   padding: 0.15rem 0.5rem; border-radius: 999px; border: 1px solid var(--line);
   background: var(--panel-2); color: var(--ink-2);
 }
-.keycmp .differ { color: var(--ok); border-color: var(--ok); background: var(--ok-wash); }
-.keycmp .same { color: var(--bad); border-color: var(--bad); background: var(--bad-wash); }
+.keycmp .differ { color: var(--ok-ink); border-color: var(--ok); background: var(--ok-wash); }
+.keycmp .same { color: var(--bad-ink); border-color: var(--bad); background: var(--bad-wash); }
 
 /* --------------------------------------------------------------- lab mode */
 
@@ -464,7 +488,7 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
   background: var(--panel); color: var(--ink-2);
 }
 .mode + .mode { border-left: 1px solid var(--line); }
-.mode[aria-pressed="true"] { background: var(--accent); color: #fff; }
+.mode[aria-pressed="true"] { background: var(--btn-fill); color: var(--btn-ink); }
 
 .presets { display: flex; flex-wrap: wrap; gap: 0.35rem; flex: 1 1 auto; min-width: 0; }
 .preset {
@@ -488,15 +512,94 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
   background: var(--panel); color: var(--ink-2);
 }
 .ghost:hover { border-color: var(--accent); color: var(--accent-ink); }
-.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.primary:hover { background: var(--accent-ink); border-color: var(--accent-ink); }
-.primary:disabled { opacity: 0.45; cursor: not-allowed; background: var(--accent); }
+.primary { background: var(--btn-fill); border-color: var(--btn-fill); color: var(--btn-ink); }
+.primary:hover { filter: brightness(0.92); }
+.primary:disabled { opacity: 0.45; cursor: not-allowed; background: var(--btn-fill); }
 
 .lab { border-left: 4px solid var(--accent); }
 .lab .body { display: grid; grid-template-columns: minmax(0, 220px) minmax(0, 1fr); gap: 1.25rem; }
 @media (max-width: 720px) { .lab .body { grid-template-columns: minmax(0, 1fr); } }
 
+/* The four beats, named and numbered where the reader is standing. The loop is
+   the whole method — predict, change one thing, watch what moved, hear why —
+   and a reader who cannot see which beat they are in is being walked through a
+   procedure rather than taught one. */
+.beats {
+  display: flex; flex-wrap: wrap; gap: 0.3rem; margin-bottom: 0.9rem;
+  padding-bottom: 0.75rem; border-bottom: 1px solid var(--line-soft);
+}
+.beat {
+  display: inline-flex; align-items: baseline; gap: 0.4rem;
+  font-size: var(--fs-xs); padding: 0.2rem 0.55rem; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--ink-3); background: var(--panel-2);
+}
+.beat .n { font-family: var(--mono); }
+/* State by word and weight, not only by fill, so the sequence reads in
+   monochrome and at high contrast. */
+.beat[data-state="now"] {
+  border-color: var(--accent); background: var(--accent-wash);
+  color: var(--accent-ink); font-weight: 700;
+}
+.beat[data-state="done"] { color: var(--ink-2); }
+.beat[data-state="done"] .n::after { content: " ✓"; }
+
+/* What the reader is meant to be looking at, and where. */
+.moves-list { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.5rem; }
+.move-chip {
+  font-family: var(--mono); font-size: var(--fs-xs);
+  padding: 0.15rem 0.5rem; border-radius: 999px;
+  border: 1px solid var(--accent); background: var(--accent-wash); color: var(--accent-ink);
+}
+.changed-list { margin: 0.7rem 0 0; padding: 0.5rem 0.7rem; border-radius: 4px;
+  border: 1px dashed var(--line); font-size: var(--fs-xs); color: var(--ink-2); }
+.changed-list strong { color: var(--ink); }
+
+/* A standing note on what the page below the lab actually is. Dismissable,
+   because it is orientation and orientation stops being useful on the second
+   read. */
+.orient {
+  grid-column: 1 / -1;
+  display: flex; gap: 0.9rem; align-items: flex-start;
+  padding: 0.75rem 0.9rem; border-radius: var(--radius);
+  border: 1px solid var(--accent); border-left: 4px solid var(--accent);
+  background: var(--accent-wash);
+}
+.orient p { margin: 0; font-size: var(--fs-sm); color: var(--ink-2); max-width: 82ch; }
+.orient strong { color: var(--ink); }
+.orient button { flex: none; }
+
+/* -------------------------------------------------------------- challenges */
+
+.challenge-brief {
+  margin: 0.3rem 0 0; color: var(--ink-2); max-width: 68ch;
+}
+.reqs { list-style: none; margin: 1rem 0 0; display: flex; flex-direction: column; gap: 0.3rem; }
+.req {
+  display: grid; grid-template-columns: 1.6rem minmax(0, 1fr); gap: 0.5rem;
+  align-items: baseline; font-size: var(--fs-sm);
+  padding: 0.35rem 0.5rem; border-radius: 4px; border: 1px solid var(--line-soft);
+}
+.req .mark { font-family: var(--mono); font-weight: 700; }
+.req[data-met="true"] { border-color: var(--ok); background: var(--ok-wash); }
+.req[data-met="true"] .mark { color: var(--ok-ink); }
+.req[data-met="false"] .mark { color: var(--ink-3); }
+.challenge-state {
+  margin: 0.9rem 0 0; padding: 0.5rem 0.7rem; border-radius: 4px;
+  font-size: var(--fs-sm); font-weight: 600;
+  border: 1px solid var(--line); color: var(--ink-2);
+}
+.challenge-state.solved { border-color: var(--ok); background: var(--ok-wash); color: var(--ok-ink); }
+.challenge-question { margin: 0.8rem 0 0; color: var(--ink); max-width: 68ch; }
+.exposed-rows { margin-top: 0.6rem; font-size: var(--fs-xs); color: var(--ink-2); }
+.exposed-rows div { margin-top: 0.25rem; }
+.exposed-rows .id { font-family: var(--mono); color: var(--bad-ink); font-weight: 700; }
+
 .lab-track { list-style: none; display: flex; flex-direction: column; gap: 0.15rem; }
+.lab-track .track-head {
+  font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.09em;
+  color: var(--ink-3); font-weight: 600; margin: 0.6rem 0 0.2rem;
+}
+.lab-track li:first-child .track-head { margin-top: 0; }
 .lab-track button {
   font: inherit; font-size: var(--fs-xs); text-align: left; width: 100%;
   display: grid; grid-template-columns: 1.4rem 1fr; gap: 0.5rem; align-items: baseline;
@@ -536,9 +639,9 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
   padding: 0.5rem 0.7rem; border-radius: 4px; border: 1px solid var(--line);
 }
 /* The word carries the result; the colour only agrees with it. */
-.lab-outcome.right { border-color: var(--ok); background: var(--ok-wash); color: var(--ok); }
-.lab-outcome.wrong { border-color: var(--warn); background: var(--warn-wash); color: var(--warn); }
-.lab-outcome.drift { border-color: var(--bad); background: var(--bad-wash); color: var(--bad); }
+.lab-outcome.right { border-color: var(--ok); background: var(--ok-wash); color: var(--ok-ink); }
+.lab-outcome.wrong { border-color: var(--warn); background: var(--warn-wash); color: var(--warn-ink); }
+.lab-outcome.drift { border-color: var(--bad); background: var(--bad-wash); color: var(--bad-ink); }
 .lab-explain { margin: 0.7rem 0 0; color: var(--ink-2); max-width: 68ch; }
 .lab-adversary {
   margin: 0.6rem 0 0; font-family: var(--mono); font-size: var(--fs-xs); color: var(--ink-3);
@@ -578,7 +681,7 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
 .why-row + .why-row { margin-top: 0.45rem; }
 .why-row dt {
   font-size: var(--fs-xs); text-transform: uppercase; letter-spacing: 0.07em;
-  color: var(--ink-3); font-weight: 600;
+  color: var(--ink-2); font-weight: 600;
 }
 .why-row dd { margin: 0; font-size: var(--fs-xs); color: var(--ink-2); }
 .why-demo { margin-top: 0.6rem; font-size: var(--fs-xs); padding: 0.25rem 0.6rem; }
@@ -629,9 +732,9 @@ button.term {
 /* Both are spans inside one grid cell, so they need to be blocks: left inline
    the note runs straight on from the message and the two read as one string. */
 .seq-msg { display: block; font-family: var(--mono); font-size: var(--fs-xs); color: var(--ink); word-break: break-word; }
-.seq-note { display: block; font-size: var(--fs-xs); color: var(--ink-3); margin-top: 0.15rem; }
+.seq-note { display: block; font-size: var(--fs-xs); color: var(--ink-2); margin-top: 0.15rem; }
 .seq.mitm .seq-beat { border-color: var(--bad); background: var(--bad-wash); }
-.seq.mitm .seq-who { color: var(--bad); }
+.seq.mitm .seq-who { color: var(--bad-ink); }
 @media (max-width: 620px) { .seq-beat { grid-template-columns: minmax(0, 1fr); gap: 0.15rem; } }
 
 details.internals { margin-top: 0.9rem; border-top: 1px solid var(--line-soft); padding-top: 0.6rem; }
@@ -864,6 +967,22 @@ python3 -m http.server -d web 8080</pre>
     </div>
   </div>
 
+  <!-- How the page works, said once. Everything below the lab card is a live
+       channel, and a reader who does not know that reads the console as
+       decoration around the lesson rather than as the lesson's evidence. -->
+  <div class="orient" id="orient">
+    <p>
+      <strong>Everything below this card is a live channel.</strong> The guided lab
+      moves one switch at a time; the crate re-runs a real two-party handshake and
+      two real encrypted messages, and every panel underneath — the verdict, the
+      adversary matrix, the bytes on the wire — is the result of that run. Nothing
+      here is a mock-up, so if you change a switch yourself the numbers change with
+      it. <strong>Predict before you apply.</strong> That is the step the lab is
+      built around.
+    </p>
+    <button type="button" class="ghost" id="orient-dismiss">Got it</button>
+  </div>
+
   <!-- ------------------------------------------------------------ guided -->
   <!-- Every string in this card comes from `codetalker_core::lab` and every
        outcome it predicts is asserted against the real channel in
@@ -877,9 +996,15 @@ python3 -m http.server -d web 8080</pre>
     <div class="body">
       <ol class="lab-track" id="lab-track"></ol>
       <div class="lab-main">
+        <!-- The method, named where the reader is standing in it. -->
+        <div class="beats" id="beats" aria-label="Steps in this experiment"></div>
+
         <h3 class="lab-title" id="lab-title"></h3>
         <p class="lab-concept" id="lab-concept"></p>
         <p class="lab-instruction" id="lab-instruction"></p>
+        <!-- The switches this step moves, spelled out as on → off rather than
+             left for the reader to spot in a rail of six. -->
+        <div class="moves-list" id="lab-moves"></div>
         <p class="lab-start" id="lab-start"></p>
 
         <fieldset class="predict" id="lab-predict">
@@ -893,11 +1018,32 @@ python3 -m http.server -d web 8080</pre>
              they were told to watch. -->
         <div class="lab-reveal" id="lab-reveal" hidden aria-live="polite">
           <p class="lab-outcome" id="lab-outcome"></p>
+          <p class="changed-list" id="lab-changed"></p>
           <p class="lab-explain" id="lab-explain"></p>
           <p class="lab-adversary" id="lab-adversary"></p>
           <div class="lab-nav">
             <button type="button" class="primary" id="lab-next">Next experiment</button>
             <button type="button" class="ghost" id="lab-explore-here">Keep this state and explore</button>
+          </div>
+        </div>
+
+        <!-- A goal, not a recipe. The console scores the configuration against
+             each condition as the reader works. -->
+        <div class="lab-challenge" id="lab-challenge" hidden>
+          <p class="challenge-brief" id="challenge-brief"></p>
+          <ul class="reqs" id="challenge-reqs"></ul>
+          <p class="challenge-state" id="challenge-state" aria-live="polite"></p>
+          <div id="challenge-done" hidden>
+            <p class="challenge-question" id="challenge-question"></p>
+            <div class="exposed-rows" id="challenge-exposed"></div>
+            <details class="internals" id="challenge-answer-box">
+              <summary>Reveal the answer, once you have written yours down</summary>
+              <p class="lab-explain" id="challenge-answer"></p>
+            </details>
+          </div>
+          <div class="lab-nav">
+            <button type="button" class="primary" id="challenge-next">Next</button>
+            <button type="button" class="ghost" id="challenge-explore">Leave the lab and explore</button>
           </div>
         </div>
       </div>
@@ -1043,7 +1189,12 @@ python3 -m http.server -d web 8080</pre>
       </header>
       <div class="body">
         <div class="wire-meta" id="wire-meta"></div>
-        <div class="hexdump" id="hexdump"></div>
+        <!-- `aria-hidden`, with a structured equivalent below it. A screen
+             reader announcing 136 hex pairs is not access to the frame, it is a
+             denial of service dressed as one; the summary says the same thing
+             a sighted reader takes from the colours. -->
+        <div class="hexdump" id="hexdump" aria-hidden="true"></div>
+        <div class="sr-only" id="wire-sr"></div>
         <div class="legend" id="legend"></div>
         <!-- Focus or hover a key to isolate its bytes and read what the field is
              for. The colours say which run is which; they never said why any of
@@ -1136,7 +1287,7 @@ python3 -m http.server -d web 8080</pre>
        published site at any path; `../README.md` resolved above the site root
        and 404ed, and a relative `./README.md` would have quietly served the
        one-paragraph README describing this directory instead. -->
-  <span><a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire/blob/main/README.md">README</a> · <a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire/blob/main/THREAT_MODEL.md">Threat model</a> · <a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire/blob/main/SOURCES.md">Sources</a></span>
+  <span><a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire/blob/main/README.md">README</a> · <a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire/blob/main/TEACHING.md">Teaching guide</a> · <a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire/blob/main/THREAT_MODEL.md">Threat model</a> · <a href="https://github.com/systemslibrarian/crypto-lab-ablation-wire/blob/main/SOURCES.md">Sources</a></span>
 </footer>
 
 <script type="module">
@@ -1177,10 +1328,14 @@ let LAB = null;
    verdict that configuration produces, and the crate's tests run them. */
 let EXPLAIN = null;
 let mode = "guided";
-let stepIndex = 0;
+let cursor = 0;   // 0..4 experiments, then the transfer challenges
 let stage = "predict";
 let picked = null;
 let activePreset = null;
+/* The previous result, kept so the reveal can say which panels moved, and the
+   config that produced the current one, so a challenge can be rescored. */
+let lastBefore = null;
+let lastCfg = null;
 let answered = new Map();
 
 const $ = (id) => document.getElementById(id);
@@ -1461,7 +1616,7 @@ function buildControls() {
 function buildLab() {
   $("mode-guided").addEventListener("click", () => {
     setMode("guided");
-    enterStep(stepIndex);
+    enterStep(cursor);
   });
   $("mode-explore").addEventListener("click", () => setMode("explore"));
 
@@ -1487,17 +1642,30 @@ function buildLab() {
   }
 
   const track = $("lab-track");
-  LAB.steps.forEach((step, i) => {
+  const entry = (i, label, title, head) => {
     const li = document.createElement("li");
+    if (head) {
+      const h = document.createElement("div");
+      h.className = "track-head";
+      h.textContent = head;
+      li.appendChild(h);
+    }
     const b = document.createElement("button");
     b.type = "button";
     b.innerHTML = `<span class="n"></span><span class="t"></span>`;
-    b.querySelector(".n").textContent = String(i + 1);
-    b.querySelector(".t").textContent = step.title;
+    b.querySelector(".n").textContent = label;
+    b.querySelector(".t").textContent = title;
     b.addEventListener("click", () => enterStep(i));
     li.appendChild(b);
     track.appendChild(li);
-  });
+  };
+  LAB.steps.forEach((step, i) =>
+    entry(i, String(i + 1), step.title, i === 0 ? "Experiments" : null));
+  // The challenges are the same track because they are the same sequence: the
+  // experiments ask whether a reader can follow, these ask whether they can
+  // build something nobody showed them.
+  LAB.challenges.forEach((c, j) =>
+    entry(LAB.steps.length + j, String(j + 1), c.title, j === 0 ? "Transfer challenges" : null));
 
   const opts = $("lab-options");
   for (const o of LAB.outcomes) {
@@ -1515,11 +1683,21 @@ function buildLab() {
   }
 
   $("lab-lock").addEventListener("click", () => revealStep());
-  $("lab-next").addEventListener("click", () => {
-    if (stepIndex + 1 < LAB.steps.length) enterStep(stepIndex + 1);
+  const advance = () => {
+    if (cursor + 1 < LAB.steps.length + LAB.challenges.length) enterStep(cursor + 1);
     else setMode("explore");
-  });
+  };
+  $("lab-next").addEventListener("click", advance);
+  $("challenge-next").addEventListener("click", advance);
   $("lab-explore-here").addEventListener("click", () => setMode("explore"));
+  $("challenge-explore").addEventListener("click", () => setMode("explore"));
+
+  // Orientation stops being orientation on the second read.
+  $("orient-dismiss").addEventListener("click", () => {
+    $("orient").hidden = true;
+    try { localStorage.setItem("aw-oriented", "1"); } catch { /* private mode */ }
+  });
+  try { if (localStorage.getItem("aw-oriented")) $("orient").hidden = true; } catch { /* ignore */ }
 
   $("reset").addEventListener("click", () => {
     Object.assign(state, {
@@ -1582,49 +1760,143 @@ function applySetup(setup) {
 }
 
 function enterStep(i, { reveal = false } = {}) {
-  stepIndex = i;
+  cursor = i;
   stage = "predict";
   picked = null;
   for (const el of document.querySelectorAll('input[name="prediction"]')) el.checked = false;
   $("lab-lock").disabled = true;
+  if (isChallenge()) {
+    // Start every challenge from the full stack. Landing on it in whatever
+    // state experiment 5 left behind would mean two readers doing the same task
+    // from different places, some of them already accidentally holding a
+    // condition — and a checklist that starts partly ticked for reasons the
+    // reader did not cause teaches nothing about which move earned it.
+    const base = LAB.scenarios.find((s) => s.id === "full-stack");
+    if (base) applySetup(base.setup);
+    run();
+    renderLab();
+    return;
+  }
   applySetup(LAB.steps[i].before);
   run();
   if (reveal) revealStep({ score: false });
   else renderLab();
 }
 
+const isChallenge = () => cursor >= LAB.steps.length;
+const currentChallenge = () => LAB.challenges[cursor - LAB.steps.length] ?? null;
+
 function revealStep({ score = true } = {}) {
-  const step = LAB.steps[stepIndex];
+  const step = LAB.steps[cursor];
   stage = "reveal";
   applySetup(step.after);
   run({ flashChanges: true, moved: step.moves });
   if (score) answered.set(step.id, picked === last.verdict);
   renderLab();
+  // The flash is the observe beat, and a flash below the fold is nothing at
+  // all. Scroll only when the verdict is actually off screen, and never move
+  // focus — the reader was told to watch the console, not to be sent there.
+  const card = $("verdict").getBoundingClientRect();
+  if (card.top < 0 || card.top > window.innerHeight - 80) {
+    $("verdict").scrollIntoView({ block: "center", behavior: "smooth" });
+  }
+}
+
+/* The four beats, named where the reader is standing in them. */
+const BEATS = ["Predict", "Change one thing", "Observe", "Why"];
+
+function renderBeats() {
+  const box = $("beats");
+  box.innerHTML = "";
+  const at = stage === "predict" ? 0 : 2;
+  BEATS.forEach((name, i) => {
+    const el = document.createElement("span");
+    el.className = "beat";
+    // Predict and Change are one action from the reader's side (choose, then
+    // apply), as are Observe and Why; marking the pair keeps the labels honest
+    // about what a single click does.
+    el.dataset.state = i < at ? "done" : i <= at + 1 ? "now" : "todo";
+    el.innerHTML = `<span class="n"></span><span></span>`;
+    el.querySelector(".n").textContent = String(i + 1);
+    el.querySelector("span:last-child").textContent = name;
+    box.appendChild(el);
+  });
+}
+
+/* The switches this step moves, as positions rather than names: "Peer
+   authentication: on → off" is an instruction, "authenticate" is a variable. */
+function renderMoves(step) {
+  const box = $("lab-moves");
+  box.innerHTML = "";
+  for (const key of step.moves) {
+    const nameEl = document.querySelector(`.switch[data-key="${key}"] .switch-name`);
+    const chip = document.createElement("span");
+    chip.className = "move-chip";
+    chip.textContent =
+      `${nameEl ? nameEl.textContent : key}: ` +
+      `${step.before[key] ? "on" : "off"} → ${step.after[key] ? "on" : "off"}`;
+    box.appendChild(chip);
+  }
+}
+
+/* Which panels actually moved, in the words the page uses for them. "Something
+   changed somewhere" is not an observation, and on a console this size neither
+   is an outline the reader has already scrolled past. */
+function changedSummary(prev, next) {
+  if (!prev) return [];
+  const out = [];
+  if (prev.verdict !== next.verdict) out.push("the verdict");
+  for (const a of next.adversaries) {
+    const before = prev.adversaries.find((x) => x.id === a.id);
+    if (before && before.status !== a.status) {
+      out.push(`${a.id} in Which adversary (${before.status} → ${a.status})`);
+    }
+  }
+  if (prev.keysDiffer !== next.keysDiffer) out.push("the message-key comparison");
+  if (prev.noncesDiffer !== next.noncesDiffer) out.push("the nonce comparison");
+  if (prev.frames[0].wireLen !== next.frames[0].wireLen) out.push("the wire length");
+  if (prev.authenticated !== next.authenticated) out.push("the handshake sequence");
+  if (prev.metadata.length !== next.metadata.length) out.push("what leaks regardless");
+  return out;
 }
 
 function renderLab() {
-  const step = LAB.steps[stepIndex];
+  const total = LAB.steps.length + LAB.challenges.length;
   const right = [...answered.values()].filter(Boolean).length;
+  const challenge = currentChallenge();
+
   $("lab-progress").textContent =
-    `experiment ${stepIndex + 1} of ${LAB.steps.length}` +
+    (challenge
+      ? `transfer challenge ${cursor - LAB.steps.length + 1} of ${LAB.challenges.length}`
+      : `experiment ${cursor + 1} of ${LAB.steps.length}`) +
     (answered.size ? ` · ${right} of ${answered.size} predictions correct` : "");
 
   [...$("lab-track").querySelectorAll("button")].forEach((b, i) => {
-    b.classList.toggle("done", answered.has(LAB.steps[i].id));
-    if (i === stepIndex) b.setAttribute("aria-current", "step");
+    const id = i < LAB.steps.length ? LAB.steps[i].id : LAB.challenges[i - LAB.steps.length].id;
+    b.classList.toggle("done", answered.has(id));
+    if (i === cursor) b.setAttribute("aria-current", "step");
     else b.removeAttribute("aria-current");
   });
 
+  $("lab-challenge").hidden = !challenge;
+  $("lab-predict").hidden = !!challenge || stage !== "predict";
+  $("lab-reveal").hidden = !!challenge || stage === "predict";
+  $("beats").hidden = !!challenge;
+
+  if (challenge) return renderChallenge(challenge);
+
+  const step = LAB.steps[cursor];
+  renderBeats();
+  renderMoves(step);
   $("lab-title").textContent = step.title;
   $("lab-concept").textContent = step.concept;
   $("lab-instruction").textContent = step.instruction;
   $("lab-question").textContent = step.question;
 
   const predicting = stage === "predict";
-  $("lab-predict").hidden = !predicting;
-  $("lab-reveal").hidden = predicting;
   $("lab-start").textContent = predicting
-    ? "The console is already in this experiment's starting state. Predict first, then apply."
+    ? "The console below is already in this experiment's starting state — look at it now, "
+      + "so you have something to compare against. Then predict, then apply."
     : "";
   if (predicting) return;
 
@@ -1652,10 +1924,96 @@ function renderLab() {
     out.textContent = `You predicted ${label(picked)}. The channel produced ${label(got)}.`;
   }
 
+  const moved = changedSummary(lastBefore, last);
+  $("lab-changed").innerHTML = "";
+  const strong = document.createElement("strong");
+  strong.textContent = moved.length ? "What moved: " : "Nothing on the console moved. ";
+  $("lab-changed").appendChild(strong);
+  $("lab-changed").appendChild(document.createTextNode(
+    moved.length
+      ? moved.join(", ") + ". Everything else is exactly where it was."
+      : "That is the result, not a failure — this experiment's point is that the "
+        + "change you made costs the adversary nothing."));
+
   $("lab-explain").textContent = step.explain;
   $("lab-adversary").textContent = `Threat model: ${step.adversary}`;
-  $("lab-next").textContent =
-    stepIndex + 1 < LAB.steps.length ? "Next experiment" : "Finish — open the full console";
+  $("lab-next").textContent = cursor + 1 < total ? "Next" : "Finish — open the full console";
+}
+
+/* ------------------------------------------------------- challenges */
+
+function renderChallenge(ch) {
+  $("lab-title").textContent = ch.title;
+  $("lab-concept").textContent =
+    "No walkthrough for this one. The console has been reset to the full stack — "
+    + "work from there using the switches below, and the conditions tick off as "
+    + "you meet them.";
+  $("lab-instruction").textContent = "";
+  $("lab-moves").innerHTML = "";
+  $("lab-start").textContent = "";
+  $("challenge-brief").textContent = ch.brief;
+  $("challenge-question").textContent = ch.question;
+  $("challenge-answer").textContent = ch.answer;
+  $("challenge-next").textContent =
+    cursor + 1 < LAB.steps.length + LAB.challenges.length ? "Next" : "Finish — open the full console";
+  scoreChallenge();
+}
+
+/* Scored by the crate against the live configuration, condition by condition —
+   a pass/fail would leave someone three conditions into four with nothing to go
+   on. */
+function scoreChallenge() {
+  const ch = currentChallenge();
+  if (!ch || !lastCfg) return;
+  let card;
+  try {
+    card = wasm.check_challenge(ch.id, lastCfg);
+  } catch (err) {
+    $("challenge-state").textContent = String(err);
+    return;
+  }
+
+  const list = $("challenge-reqs");
+  list.innerHTML = "";
+  ch.requirements.forEach((label, i) => {
+    const li = document.createElement("li");
+    li.className = "req";
+    li.dataset.met = String(!!card.met[i]);
+    li.innerHTML = `<span class="mark"></span><span class="text"></span>`;
+    // The mark is a character, not a colour: this list has to read on a
+    // printout and under a screen reader.
+    li.querySelector(".mark").textContent = card.met[i] ? "✓" : "·";
+    li.querySelector(".text").textContent = label;
+    list.appendChild(li);
+  });
+
+  const met = card.met.filter(Boolean).length;
+  const stateEl = $("challenge-state");
+  stateEl.classList.toggle("solved", card.solved);
+  stateEl.textContent = card.solved
+    ? "Solved — every condition met. Now answer the question below before revealing anything."
+    : `${met} of ${ch.requirements.length} conditions met. Keep going.`;
+  $("challenge-done").hidden = !card.solved;
+  if (card.solved) answered.set(ch.id, true);
+
+  // The debrief for a challenge is the reader's own threat matrix, not a canned
+  // paragraph: whichever adversaries their configuration leaves exposed are the
+  // ones the question is about.
+  const box = $("challenge-exposed");
+  box.innerHTML = "";
+  if (!card.solved || !last) return;
+  const exposed = last.adversaries.filter((a) => a.status === "exposed");
+  if (!exposed.length) return;
+  const head = document.createElement("div");
+  head.textContent = "Still exposed in the configuration you built:";
+  box.appendChild(head);
+  for (const a of exposed) {
+    const row = document.createElement("div");
+    row.innerHTML = `<span class="id"></span> <span class="why"></span>`;
+    row.querySelector(".id").textContent = a.id;
+    row.querySelector(".why").textContent = `${a.label} — ${a.because}`;
+    box.appendChild(row);
+  }
 }
 
 /* ----------------------------------------------------------- url state */
@@ -1671,7 +2029,7 @@ function writeHash() {
   const p = new URLSearchParams();
   p.set("m", mode === "guided" ? "g" : "e");
   if (mode === "guided") {
-    p.set("s", String(stepIndex + 1));
+    p.set("s", String(cursor + 1));
     p.set("st", stage === "reveal" ? "r" : "p");
   }
   p.set("c", LAYERS.map((l) => (state[l.key] ? "1" : "0")).join(""));
@@ -1707,7 +2065,8 @@ function readHash() {
 
   const guided = p.get("m") !== "e";
   const n = parseInt(p.get("s") || "1", 10);
-  const i = Math.min(Math.max(Number.isFinite(n) ? n : 1, 1), LAB.steps.length) - 1;
+  const stops = LAB.steps.length + LAB.challenges.length;
+  const i = Math.min(Math.max(Number.isFinite(n) ? n : 1, 1), stops) - 1;
   restoring = false;
 
   // In guided mode the *experiment* is the shared thing, so its own starting
@@ -1715,7 +2074,7 @@ function readHash() {
   // is the shared thing. `m` is what disambiguates the two.
   if (guided) {
     setMode("guided");
-    enterStep(i, { reveal: p.get("st") === "r" });
+    enterStep(i, { reveal: p.get("st") === "r" && i < LAB.steps.length });
   } else {
     setMode("explore");
     run();
@@ -1795,6 +2154,7 @@ function syncDependencies() {
 
 function run({ flashChanges = false, moved = null } = {}) {
   const prev = last;
+  lastBefore = prev;
   syncDependencies();
   const cfg = {
     plaintext: $("msg1").value,
@@ -1829,7 +2189,11 @@ function run({ flashChanges = false, moved = null } = {}) {
   renderReceiver(result);
   renderSequence(result);
   renderFacts(result, cfg);
+  lastCfg = cfg;
   markPreset();
+  // A challenge is scored on every run, because the reader is meant to work at
+  // the switches and watch the conditions tick off rather than submit an answer.
+  if (LAB && isChallenge()) scoreChallenge();
   writeHash();
   if (flashChanges) flashDiff(prev, result, moved);
 }
@@ -2029,6 +2393,14 @@ function renderWire(r) {
 
   // Each key isolates its own bytes and says what the field is for. The colours
   // already said which run is which; they never said why any of them is there.
+  // The structured equivalent of the dump, for anyone not reading the colours.
+  const parts = frame.segments.map(
+    (seg) => `${KIND_LABELS[seg.kind] ?? seg.kind}, ${seg.hex.length / 2} bytes`);
+  $("wire-sr").textContent =
+    `Frame ${activeFrame + 1} on the wire, ${frame.wireLen} bytes in ` +
+    `${frame.segments.length} fields: ${parts.join("; ")}. ` +
+    `Nonce ${frame.nonce}. Message counter ${frame.counter}.`;
+
   const kinds = [...new Set(frame.segments.map((s) => s.kind))];
   $("legend").innerHTML = "";
   $("field-purpose").textContent = "";
