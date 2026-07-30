@@ -1,7 +1,8 @@
-# codetalker
+# Ablation Wire
 
-The 1942 Navajo code-talker stack, rebuilt on modern primitives, with every
-layer independently switchable.
+The codetalker stack — the 1942 Navajo code-talker stack rebuilt on modern
+primitives, with every layer independently switchable. The internal crates are
+`codetalker-core` and `codetalker-wasm`, and they keep those names.
 
 The point is not to build a secure channel. It is to let a reader turn layers
 off and discover which one was actually load-bearing.
