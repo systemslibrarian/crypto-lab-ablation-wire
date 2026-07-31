@@ -104,6 +104,13 @@ jobs:
           tar xzf "$tarball" actionlint
           ./actionlint -color
 
+      # TEACHING.md hands a classroom five URLs and the page footer links four
+      # documents by absolute blob URL. `check-artifact.sh` checks the page's
+      # references; nothing checked the documents'. Offline by design -- every
+      # link it verifies is one this repository controls.
+      - name: Documents point at things that exist
+        run: node .github/checks/links.mjs
+
   wasm:
     runs-on: ubuntu-latest
     steps:

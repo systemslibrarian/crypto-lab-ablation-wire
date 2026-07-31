@@ -1,0 +1,92 @@
+<!doctype html>
+<!--
+  The source of web/og.png, committed so the card can be regenerated rather than
+  recovered from whoever made it last.
+
+    node .github/checks/og.mjs
+
+  The previous card showed the console as it looked before the guided lab
+  existed, which made the social preview an advertisement for a page that no
+  longer looks like that. Keep the alt text in web/index.html describing what is
+  actually drawn here: alt text for an image the reader cannot see is the one
+  string where being out of date does active harm.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 630px; }
+  body {
+    background: #12151b;
+    color: #e7ecf4;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    display: grid; grid-template-columns: 1fr 430px;
+    /* The published page's own accent, so the card and the site agree. */
+    border-left: 10px solid #7aa5d9;
+  }
+  .left { padding: 62px 40px 52px 58px; display: flex; flex-direction: column; }
+  .kicker {
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 20px; letter-spacing: 0.16em; text-transform: uppercase; color: #7aa5d9;
+  }
+  h1 {
+    font-family: ui-serif, "Iowan Old Style", Palatino, Georgia, serif;
+    font-size: 76px; line-height: 1.02; letter-spacing: -0.02em; margin-top: 18px;
+  }
+  .thesis { margin-top: 22px; font-size: 25px; line-height: 1.42; color: #a8b3c4; max-width: 21ch; }
+  .beats { margin-top: auto; display: flex; gap: 10px; flex-wrap: wrap; }
+  .beat {
+    font-size: 19px; padding: 8px 16px; border-radius: 999px;
+    border: 1px solid #2f3745; background: #212734; color: #8b95a6;
+  }
+  .beat.on { border-color: #7aa5d9; background: #1c2735; color: #9dc0ea; font-weight: 700; }
+
+  .right { padding: 62px 58px 52px 0; display: flex; flex-direction: column; justify-content: center; gap: 15px; }
+  .sw { display: grid; grid-template-columns: 62px 1fr; gap: 18px; align-items: center; }
+  .sw > span:last-child { min-width: 0; }
+  .track {
+    width: 62px; height: 33px; border-radius: 999px;
+    background: #7aa5d9; border: 1px solid #7aa5d9; position: relative;
+  }
+  .track::after {
+    content: ""; position: absolute; top: 3px; left: 32px;
+    width: 25px; height: 25px; border-radius: 999px; background: #12151b;
+  }
+  .sw.off .track { background: #2f3745; border-color: #2f3745; }
+  .sw.off .track::after { left: 3px; background: #12151b; }
+  .sw.off .name { color: #656e7d; }
+  /* Blocks, not inline spans: left inline the subtitle runs straight on from
+     the name and the pair reads as one string. */
+  .name { display: block; font-size: 23px; font-weight: 600; }
+  .sub { display: block; font-size: 17px; color: #8b95a6; margin-top: 2px; }
+  .verdict {
+    margin-top: 22px; padding: 15px 20px; border-radius: 8px;
+    border: 1px solid #e2695c; background: #2c1a19;
+    font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    font-size: 21px; color: #e2695c; font-weight: 700;
+  }
+</style>
+</head>
+<body>
+  <div class="left">
+    <div class="kicker">crypto lab</div>
+    <h1>Ablation&nbsp;Wire</h1>
+    <p class="thesis">Switch a layer off. Predict what the adversary recovers. Find out which one was load-bearing.</p>
+    <div class="beats">
+      <span class="beat on">1 Predict</span>
+      <span class="beat on">2 Change one thing</span>
+      <span class="beat">3 Observe</span>
+      <span class="beat">4 Why</span>
+    </div>
+  </div>
+  <div class="right">
+    <div class="sw"><span class="track"></span><span><span class="name">Key agreement</span><span class="sub">the pre-shared codebook</span></span></div>
+    <div class="sw off"><span class="track"></span><span><span class="name">Authenticated encryption</span><span class="sub">homophonic substitution</span></span></div>
+    <div class="sw"><span class="track"></span><span><span class="name">Transport obfuscation</span><span class="sub">a rare unwritten language</span></span></div>
+    <div class="sw"><span class="track"></span><span><span class="name">Peer authentication</span><span class="sub">absent in 1942</span></span></div>
+    <div class="sw"><span class="track"></span><span><span class="name">Symmetric ratchet</span><span class="sub">absent in 1942</span></span></div>
+    <div class="verdict">Plaintext recovered</div>
+  </div>
+</body>
+</html>

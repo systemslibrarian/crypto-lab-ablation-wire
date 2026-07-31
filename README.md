@@ -161,6 +161,7 @@ TEACHING.md          instructor guide, student worksheet, answer key
   tests/properties.rs proptest coverage of the untrusted parser
 fuzz/                cargo-fuzz targets: transport::deobfuscate, identity::verify
 .github/checks/      the page driven in a real browser, in CI: console.mjs, a11y.mjs
+                     plus links.mjs, and og.mjs which regenerates the social card
 codetalker-wasm/     wasm-bindgen surface
 web/index.html       the ablation console
 web/pkg/             wasm-pack output, generated, not committed
@@ -205,6 +206,7 @@ wasm-pack build codetalker-wasm --target web --release --out-dir ../web/pkg
 .github/check-artifact.sh                    # the Pages artifact resolves
 node .github/checks/console.mjs              # drive the page in headless Chrome
 node .github/checks/a11y.mjs                 # contrast, keyboard, zoom, screen reader
+node .github/checks/links.mjs                # every internal link in the docs resolves
 cargo llvm-cov -p codetalker-core --no-default-features --features classical,pq \
   --summary-only                             # coverage; CI floors this at 80%
 ```
@@ -358,9 +360,10 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | Transfer challenges | 2 goals in `lab.rs`, scored by the crate; each asserted solvable by its own solution *and* asserted to reject the near miss a reader would actually make |
 | Teaching guide | [TEACHING.md](TEACHING.md)'s preset table asserted against `lab::SCENARIOS`; every experiment and challenge asserted present |
 | Accessibility | **16 checks, in CI on every push** — WCAG AA contrast over every text-bearing element in both themes, the guided flow operable without a pointer, no horizontal scroll at 640/390/320 CSS px, a structured equivalent to the hexdump, and every control named |
-| Console, in a browser | **87 checks, in CI on every push** — the full five-experiment run, prediction scoring, link restore, every preset, reset, every caption's "show me", the glossary, both handshake pictures, the hexdump keys, the four-beat indicator, the what-moved report, and both transfer challenges scored condition by condition |
+| Console, in a browser | **88 checks, in CI on every push** — the full five-experiment run, prediction scoring, link restore, every preset, reset, every caption's "show me", the glossary, both handshake pictures, the hexdump keys, the four-beat indicator, the what-moved report, both transfer challenges scored condition by condition, and every one of 134 configurations round-tripped through its own link |
 | Deployed demo | **384 configurations driven on the published artifact** — every backend × both suites × all 64 layer combinations, none throwing, no console errors |
 | `check-artifact.sh` | every relative reference resolves inside `web/` |
+| Documentation links | every relative path, self-referential Pages URL and own-repo blob URL in all 9 documents resolves, checked in CI |
 | `cargo fuzz deobfuscate` | 45,027,157 executions, no crashes |
 | `cargo fuzz identity_verify` | 577,993 classical + 608,145 with `pq`, no crashes |
 | Scheduled fuzzing | nightly, 20 min per target, against a corpus cached between runs — demonstrated: the second run restored 169 seeds and libFuzzer reported them |

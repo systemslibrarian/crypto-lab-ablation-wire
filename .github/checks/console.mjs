@@ -156,6 +156,51 @@ await r.run(() => withPage(async ({ ev, goto, logs, base }) => {
              document.getElementById('lab-card').hidden;
     })()`), await ev(`location.hash`));
 
+  // Two hand-picked links prove two links work. TEACHING.md hands a classroom
+  // five URLs and invites instructors to write their own, so what matters is
+  // that the encoding is lossless over the whole state space -- a dropped bit
+  // shows up as a lab that silently starts in the wrong configuration.
+  //
+  // Driven through `hashchange` rather than a navigation per case: the page
+  // listens for it and re-reads, which exercises the same `readHash` a pasted
+  // link does, 768 times faster.
+  await goto(base);
+  const roundTrip = await ev(`(async () => {
+    const bad = [];
+    const backends = [...document.getElementById('backend').options].map(o => o.value);
+    const cases = [];
+    for (let mask = 0; mask < 64; mask++) {
+      for (const sp of ['0', '1']) {
+        const c = [0,1,2,3,4,5].map(b => (mask >> b) & 1).join('');
+        cases.push({ c, sp, k: backends[0], a: 'aes' });
+      }
+    }
+    // ...and every backend/suite pairing at one representative state, so the
+    // two selects are covered without 768 handshakes.
+    for (const k of backends) for (const a of ['aes', 'chacha']) cases.push({ c: '111110', sp: '1', k, a });
+
+    for (const t of cases) {
+      const asked = '#m=e&c=' + t.c + '&sp=' + t.sp + '&k=' + t.k + '&a=' + t.a;
+      location.hash = asked;
+      await new Promise(r => setTimeout(r, 0));
+      const got = location.hash;
+      const on = (key) => document.querySelector('.switch[data-key="' + key + '"] input').checked;
+      const keys = ['keyAgreement','aead','transport','authenticate','ratchet','nonceReuse'];
+      const state = keys.map(k => on(k) ? '1' : '0').join('');
+      if (got !== asked) bad.push('hash ' + asked + ' came back as ' + got);
+      else if (state !== t.c) bad.push('switches ' + state + ' for ' + asked);
+      else if (on('adversaryKnowsTransport') !== (t.sp === '1')) bad.push('speaker for ' + asked);
+      else if (document.getElementById('backend').value !== t.k ||
+               document.getElementById('suite').value !== t.a) bad.push('selects for ' + asked);
+      if (bad.length > 3) break;
+    }
+    return { checked: cases.length, bad };
+  })()`);
+  check("every configuration survives a round trip through its own link",
+    roundTrip.bad.length === 0,
+    `${roundTrip.checked} states; ` + roundTrip.bad.slice(0, 3).join(" | "));
+
+  await goto(base + "#m=e&c=100110&sp=1&k=x25519&a=chacha");
   check("a switch that cannot act says why", await ev(`
     document.querySelector('.switch[data-key="adversaryKnowsTransport"]').classList.contains('disabled') &&
     document.querySelector('.switch[data-key="adversaryKnowsTransport"] .switch-why').textContent.length > 5`));
