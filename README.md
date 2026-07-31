@@ -337,6 +337,26 @@ Node's global `WebSocket`; a repository that verifies its linter against a
 recorded SHA has no business pulling a browser-automation dependency tree to test
 one static page.
 
+### One mistake, checked instead of remembered
+
+Two sibling `<span>`s authored as separate fields are inline by default, so they
+render as one word: `reply { ct }encapsulates a fresh shared secret`. It happened
+twice here — in the handshake sequence and again, three commits later, in the
+social card — both times from the same assumption, and both times it was caught
+by someone looking at a render rather than by anything checking.
+
+`RUN_TOGETHER` in the check harness looks for the signature: the last line of one
+element's text ending exactly where the next element's first line begins, with no
+whitespace authored between them. It measures the *text* through a `Range` rather
+than the boxes, so a table cell whose padding separates the words is separated.
+It runs over seven console states in `a11y.mjs`, and the card generator refuses
+to write a PNG that trips it.
+
+Where abutting is the intent — the byte grid, and the recovered plaintext running
+into the blocks that mark where the crib ran out — the markup says so with
+`data-joined="why"`. The reason belongs next to the thing it explains rather than
+in a list of exceptions inside the checker.
+
 ## Verification status
 
 Measured on rustc 1.97.1, aarch64-apple-darwin.
@@ -359,7 +379,7 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | Layer captions | 6 panels in `explain.rs`, each carrying the configuration that demonstrates it; every "show me" asserted to produce the verdict its caption claims |
 | Transfer challenges | 2 goals in `lab.rs`, scored by the crate; each asserted solvable by its own solution *and* asserted to reject the near miss a reader would actually make |
 | Teaching guide | [TEACHING.md](TEACHING.md)'s preset table asserted against `lab::SCENARIOS`; every experiment and challenge asserted present |
-| Accessibility | **16 checks, in CI on every push** — WCAG AA contrast over every text-bearing element in both themes, the guided flow operable without a pointer, no horizontal scroll at 640/390/320 CSS px, a structured equivalent to the hexdump, and every control named |
+| Accessibility | **17 checks, in CI on every push** — WCAG AA contrast over every text-bearing element in both themes, the guided flow operable without a pointer, no horizontal scroll at 640/390/320 CSS px, a structured equivalent to the hexdump, every control named, and no two fields rendering as one word |
 | Console, in a browser | **88 checks, in CI on every push** — the full five-experiment run, prediction scoring, link restore, every preset, reset, every caption's "show me", the glossary, both handshake pictures, the hexdump keys, the four-beat indicator, the what-moved report, both transfer challenges scored condition by condition, and every one of 134 configurations round-tripped through its own link |
 | Deployed demo | **384 configurations driven on the published artifact** — every backend × both suites × all 64 layer combinations, none throwing, no console errors |
 | `check-artifact.sh` | every relative reference resolves inside `web/` |

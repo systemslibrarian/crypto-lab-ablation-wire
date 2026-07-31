@@ -1172,7 +1172,11 @@ python3 -m http.server -d web 8080</pre>
           </div>
           <div class="pad-line">
             <div class="eyebrow">Recovered — message 2, never transmitted in clear</div>
-            <div class="pad-val" id="pad-out"></div>
+            <!-- The recovered bytes run straight into the blocks marking where
+                 recovery stopped; a gap between them would misplace every byte
+                 after the boundary. -->
+            <div class="pad-val" id="pad-out"
+                 data-joined="recovered bytes continue directly into the blocks that mark the crib's limit"></div>
           </div>
         </div>
         <div class="bound-note" id="pad-bound"></div>
@@ -1193,7 +1197,8 @@ python3 -m http.server -d web 8080</pre>
              reader announcing 136 hex pairs is not access to the frame, it is a
              denial of service dressed as one; the summary says the same thing
              a sighted reader takes from the colours. -->
-        <div class="hexdump" id="hexdump" aria-hidden="true"></div>
+        <div class="hexdump" id="hexdump" aria-hidden="true"
+             data-joined="a byte grid, not prose: the cells abut on purpose and each carries its own trailing space"></div>
         <div class="sr-only" id="wire-sr"></div>
         <div class="legend" id="legend"></div>
         <!-- Focus or hover a key to isolate its bytes and read what the field is

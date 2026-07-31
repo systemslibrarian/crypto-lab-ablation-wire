@@ -9,7 +9,7 @@
 //
 // Run with: node .github/checks/a11y.mjs
 
-import { withPage, reporter } from "./harness.mjs";
+import { withPage, reporter, RUN_TOGETHER } from "./harness.mjs";
 
 const r = reporter("accessibility");
 
@@ -176,6 +176,24 @@ await r.run(() => withPage(async ({ ev, send, goto, base }) => {
     sr.verdictLive === "polite" && sr.revealLive === "polite");
   check("colour is never the only carrier: every threat status is spelled out",
     sr.statusInWords);
+
+  // ----------------------------------------------------- run-together text
+  // Sibling spans authored as separate fields are inline by default, so they
+  // render as one word. It has happened twice here, from the same assumption
+  // about `<span>`, and both times it was caught by someone looking at a render
+  // rather than by anything checking. Swept across the states that build their
+  // rows from templates, since that is where the pattern lives.
+  const joined = [];
+  for (const url of ["", "#m=g&s=3&st=r", "#m=g&s=5&st=r", "#m=g&s=6", "#m=g&s=7",
+                     "#m=e&c=001110&sp=1", "#m=e&c=111101&sp=1"]) {
+    await goto(base + url);
+    await ev(`document.querySelectorAll('.why-toggle').forEach((t) => t.click())`);
+    await ev(`document.querySelector('details.internals').open = true`);
+    for (const found of await ev(RUN_TOGETHER("main *, .masthead *, .foot *"))) {
+      joined.push(url || "/" , found);
+    }
+  }
+  check("no two fields render as one word", joined.length === 0, joined.slice(0, 6).join(" | "));
 
   // --------------------------------------------------------- motion
   // The global reduce rule kills the animation, which would leave the observe

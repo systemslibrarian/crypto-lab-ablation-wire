@@ -10,7 +10,7 @@ import { spawn } from "node:child_process";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { serve } from "./harness.mjs";
+import { serve, RUN_TOGETHER } from "./harness.mjs";
 
 const root = new URL("../../", import.meta.url).pathname;
 const OUT = join(root, "web/og.png");
@@ -18,7 +18,6 @@ const port = 8791, cdp = 9791;
 
 const server = await serve(join(root, ".github"), port);
 const profile = await mkdtemp(join(tmpdir(), "og-"));
-const { default: which } = { default: null };
 const candidates = [
   process.env.CHROME,
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
@@ -61,6 +60,26 @@ try {
     { width: 1200, height: 630, deviceScaleFactor: 1, mobile: false });
   await send("Page.navigate", { url: `http://127.0.0.1:${port}/og-card.html` });
   await new Promise((r) => setTimeout(r, 900));
+
+  // Refuse to write a card whose fields have run together. This is the exact
+  // defect the last version of this file shipped -- the switch name and its
+  // subtitle rendering as one word -- and it survived because a generator has
+  // no reviewer but the person who looks at the PNG afterwards.
+  await send("Runtime.enable");
+  const joined = (await send("Runtime.evaluate", {
+    expression: RUN_TOGETHER("body *"), returnByValue: true,
+  })).result.value;
+  if (joined.length) {
+    // Explicit, not a throw. A rejection here was exiting 0 -- something in the
+    // teardown below was swallowing it -- which would have made this refusal a
+    // message nobody's CI ever noticed.
+    process.stderr.write("fields run together in the card, refusing to write it:\n  " +
+                         joined.join("\n  ") + "\n");
+    process.exitCode = 1;
+    ws.close();
+    throw new Error("card rejected");
+  }
+
   const { data } = await send("Page.captureScreenshot", {
     format: "png",
     clip: { x: 0, y: 0, width: 1200, height: 630, scale: 1 },
@@ -68,6 +87,11 @@ try {
   await writeFile(OUT, Buffer.from(data, "base64"));
   process.stdout.write(`wrote web/og.png (1200x630)\n`);
   ws.close();
+} catch (err) {
+  if (process.exitCode !== 1) {
+    process.stderr.write(String(err) + "\n");
+    process.exitCode = 1;
+  }
 } finally {
   chrome.kill();
   await new Promise((r) => server.close(r));

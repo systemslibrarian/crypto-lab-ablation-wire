@@ -132,6 +132,70 @@ async function connect(port) {
   return { send, ev, logs, close: () => ws.close() };
 }
 
+/**
+ * Adjacent text that renders as one word.
+ *
+ * Two sibling `<span>`s authored as separate fields are inline by default, so
+ * they run together and "reply { ct }" plus "encapsulates a fresh secret" reads
+ * as `reply { ct }encapsulates a fresh secret`. It is invisible in the source,
+ * invisible in review, and obvious in a render — which is exactly the kind of
+ * defect that gets caught by whoever happens to look. It has now happened twice
+ * in this repository, in the handshake sequence and in the social card, from the
+ * same author making the same assumption about `<span>`.
+ *
+ * The signature is precise enough to check: the last line of one element's text
+ * ends where the next element's first line begins, with no whitespace authored
+ * between them and none at the edges of either. Measured on the *text*, via
+ * `Range`, not on the boxes — a table cell whose padding separates the words is
+ * separated even though the boxes abut.
+ *
+ * Where abutting *is* the intent, say so in the markup with `data-joined="why"`
+ * rather than teaching this function a list of exceptions: the reason belongs
+ * next to the thing it explains, where the next person to touch it will see it.
+ *
+ * Pass a CSS selector for roots to search. Returns a list of offending pairs.
+ */
+export const RUN_TOGETHER = (roots) => `(() => {
+  const vis = (el) => {
+    const cs = getComputedStyle(el);
+    if (cs.display === 'none' || cs.visibility === 'hidden' || cs.opacity === '0') return false;
+    // Absolutely positioned things are out of flow; abutting means nothing.
+    if (cs.position === 'absolute' || cs.position === 'fixed') return false;
+    const r = el.getBoundingClientRect();
+    return r.width > 0 && r.height > 0;
+  };
+  const out = [];
+  for (const parent of document.querySelectorAll(${JSON.stringify(roots)})) {
+    if (parent.closest('[data-joined]')) continue;
+    const kids = [...parent.children].filter((e) => (e.textContent || '').trim() && vis(e));
+    for (let i = 0; i + 1 < kids.length; i++) {
+      const a = kids[i], b = kids[i + 1];
+      // Whitespace authored between them, or at the inner edges, means the join
+      // was intended.
+      let spaced = /\\s$/.test(a.textContent) || /^\\s/.test(b.textContent);
+      for (let n = a.nextSibling; n && n !== b && !spaced; n = n.nextSibling) {
+        if (n.nodeType === 3 && /\\s/.test(n.textContent)) spaced = true;
+      }
+      if (spaced) continue;
+
+      const rects = (el) => { const r = document.createRange(); r.selectNodeContents(el);
+                              return [...r.getClientRects()].filter((x) => x.width > 0); };
+      const ra = rects(a), rb = rects(b);
+      if (!ra.length || !rb.length) continue;
+      // Where A's text stops, and where B's text starts.
+      const end = ra[ra.length - 1], start = rb[0];
+      const sameLine = Math.min(end.bottom, start.bottom) - Math.max(end.top, start.top) >
+                       0.5 * Math.min(end.height, start.height);
+      if (sameLine && start.left - end.right < 2) {
+        out.push((parent.className || parent.tagName) + ' :: "' +
+                 a.textContent.trim().slice(-22) + '" + "' +
+                 b.textContent.trim().slice(0, 22) + '"');
+      }
+    }
+  }
+  return out;
+})()`;
+
 /** Report, and remember whether anything failed. */
 export function reporter(title) {
   const rows = [];
