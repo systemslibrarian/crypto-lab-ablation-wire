@@ -35,6 +35,14 @@
   --panel-2: #eef1f6;
   --line: #d8dee8;
   --line-soft: #e7ebf2;
+  /* Control boundaries only (WCAG 2.1 SC 1.4.11). Text fields and selects are
+     filled with --ground (#f7f8fa), which is 1.03:1 against --panel and 1.06:1
+     against --panel-2, so the border is the only thing delineating the control.
+     #7d8494 keeps the palette's blue bias and clears 3:1 on every surface a
+     field sits on: 3.75:1 on --panel, 3.53:1 on --ground, 3.31:1 on --panel-2.
+     --line is left unchanged for decorative rules -- card outlines, dividers,
+     table rules, the switch track. */
+  --border-strong: #7d8494;
   --ink: #171b22;
   --ink-2: #454e5e;
   /* 4.49:1 on --panel and 4.31:1 on --panel-2 at #6d7789 -- both just under AA,
@@ -92,6 +100,9 @@
     --panel-2: #212734;
     --line: #2f3745;
     --line-soft: #262d39;
+    /* 4.06:1 on --ground, 3.75:1 on --panel, 3.32:1 on --panel-2. Same fix,
+       other direction. */
+    --border-strong: #6f7787;
     --ink: #e7ecf4;
     --ink-2: #a8b3c4;
     /* 4.11:1 on --panel-2 at #7b8699. Same fix, other direction. */
@@ -130,7 +141,7 @@
    directions, so both themes are restated at the token level. */
 :root[data-theme="light"] {
   --ground: #f7f8fa; --panel: #ffffff; --panel-2: #eef1f6;
-  --line: #d8dee8; --line-soft: #e7ebf2;
+  --line: #d8dee8; --line-soft: #e7ebf2; --border-strong: #7d8494;
   --ink: #171b22; --ink-2: #454e5e; --ink-3: #656e7d;
   --accent: #4c7bb8; --accent-ink: #2f5d96; --accent-wash: #e8f0f9;
   --btn-fill: #2f5d96; --btn-ink: #ffffff;
@@ -142,7 +153,7 @@
 }
 :root[data-theme="dark"] {
   --ground: #12151b; --panel: #191d25; --panel-2: #212734;
-  --line: #2f3745; --line-soft: #262d39;
+  --line: #2f3745; --line-soft: #262d39; --border-strong: #6f7787;
   --ink: #e7ecf4; --ink-2: #a8b3c4; --ink-3: #8b95a6;
   --accent: #7aa5d9; --accent-ink: #9dc0ea; --accent-wash: #1c2735;
   --ok: #4fb894; --ok-wash: #16281f;
@@ -259,7 +270,7 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
 .field input[type="text"], .field select {
   font: inherit; font-size: var(--fs-sm);
   padding: 0.45rem 0.55rem;
-  border: 1px solid var(--line); border-radius: 4px;
+  border: 1px solid var(--border-strong); border-radius: 4px;
   background: var(--ground); color: var(--ink);
   width: 100%;
 }
