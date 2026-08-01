@@ -510,6 +510,8 @@ code, .mono { font-family: var(--mono); font-variant-ligatures: none; }
   font: inherit; font-size: var(--fs-sm); font-weight: 600; cursor: pointer;
   padding: 0.35rem 0.75rem; border-radius: 4px; border: 1px solid var(--line);
   background: var(--panel); color: var(--ink-2);
+  /* 44x44 minimum tap target (WCAG 2.5.5). */
+  min-height: 44px; min-width: 44px;
 }
 .ghost:hover { border-color: var(--accent); color: var(--accent-ink); }
 .primary { background: var(--btn-fill); border-color: var(--btn-fill); color: var(--btn-ink); }
@@ -796,11 +798,6 @@ details.internals .facts { margin-top: 0.6rem; }
 </style>
 </head>
 <body>
-<!-- BEGIN crypto-lab shared header — managed; edit shared-header.html + re-run reapply-header.py
-     Identical on every lab. Self-contained styles. Accents use each demo's own
-     --accent CSS variable (teal #35d6bb fallback). The ONLY per-repo value is the
-     repo name (crypto-lab-ablation-wire) in the GitHub link.
-     Source of truth: github.com/systemslibrarian/crypto-lab/shared-header.html -->
 <style>
   .cl-topbar{
     /* The bar is always dark (#0b1512) regardless of page theme, so header
@@ -912,7 +909,6 @@ details.internals .facts { margin-top: 0.6rem; }
     else dedupeBanner();
   })();
 </script>
-<!-- END crypto-lab shared header -->
 
 
 
