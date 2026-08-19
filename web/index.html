@@ -150,17 +150,29 @@
   --warn: #b8863b; --warn-wash: #f9f0e0; --warn-ink: #855e1d;
   --hex-framing: #7a6ea8; --hex-length: #4c7bb8; --hex-ct: #454e5e;
   --hex-tag: #b8863b; --hex-pad: #b6bfcd; --hex-pt: #c4453a;
+  --shadow: 0 1px 2px rgba(20, 28, 44, 0.06), 0 4px 12px rgba(20, 28, 44, 0.04);
 }
+/* "Restated at the token level" has to mean every token the other theme moves,
+   not most of them. This block used to omit --btn-fill/--btn-ink, the three
+   semantic ink colours and --shadow. Those then fell through to the base :root,
+   which is the light palette -- so a pinned-dark page opened by a reader whose
+   OS asks for light drew the dark washes (an attribute selector outranks the
+   prefers-color-scheme media query) with the light ink on top: --ok-ink #1e6b52
+   on --ok-wash #16281f is 2.42:1, well under AA, on every .badge.on chip and
+   every .lab-outcome verdict. The palette is unchanged; the missing half of the
+   restatement is now here. */
 :root[data-theme="dark"] {
   --ground: #12151b; --panel: #191d25; --panel-2: #212734;
   --line: #2f3745; --line-soft: #262d39; --border-strong: #6f7787;
   --ink: #e7ecf4; --ink-2: #a8b3c4; --ink-3: #8b95a6;
   --accent: #7aa5d9; --accent-ink: #9dc0ea; --accent-wash: #1c2735;
-  --ok: #4fb894; --ok-wash: #16281f;
-  --bad: #e2695c; --bad-wash: #2c1a19;
-  --warn: #d4a355; --warn-wash: #2a2216;
+  --btn-fill: #7aa5d9; --btn-ink: #10141a;
+  --ok: #4fb894; --ok-wash: #16281f; --ok-ink: #4fb894;
+  --bad: #e2695c; --bad-wash: #2c1a19; --bad-ink: #e2695c;
+  --warn: #d4a355; --warn-wash: #2a2216; --warn-ink: #d4a355;
   --hex-framing: #a99ad8; --hex-length: #7aa5d9; --hex-ct: #a8b3c4;
   --hex-tag: #d4a355; --hex-pad: #4a5464; --hex-pt: #e2695c;
+  --shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 4px 14px rgba(0, 0, 0, 0.3);
 }
 
 * { box-sizing: border-box; }
