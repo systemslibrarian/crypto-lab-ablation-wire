@@ -392,3 +392,25 @@ jobs:
           path: web
       - id: pages
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+
+  # Dependabot only. Depends on every gate job in this workflow, so a bump can
+  # only merge itself once this lab's whole PR gate went green. Majors are
+  # excluded -- the 2026-08-18 batch had to hold back 109 bumps and they were
+  # overwhelmingly majors (@noble v2 dropped export subpaths, TypeScript 7,
+  # vitest 4), so those still want a human.
+  dependabot-auto-merge:
+    needs: [core, msrv, lint, wasm, supply-chain, audit, cbom, secret-independence, fuzz, coverage, nist-vectors, deploy]
+    if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@v2
+      - name: Merge minor and patch bumps
+        if: steps.meta.outputs.update-type != 'version-update:semver-major'
+        run: gh pr merge --squash --delete-branch "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
