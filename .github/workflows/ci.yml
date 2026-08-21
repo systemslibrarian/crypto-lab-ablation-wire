@@ -5,6 +5,11 @@ on:
     branches: [main]
   pull_request:
 
+  # So a deploy can be re-run by hand. A merge made with GITHUB_TOKEN raises
+  # no push event, so without this the site can only be rebuilt by a human
+  # pushing an unrelated commit.
+  workflow_dispatch:
+
 env:
   CARGO_TERM_COLOR: always
 
