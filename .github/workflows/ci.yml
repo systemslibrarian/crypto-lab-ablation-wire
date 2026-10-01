@@ -330,11 +330,12 @@ jobs:
         run: .github/fetch-vectors.sh
       - run: cargo test -p codetalker-core --features pq --test kat -- --nocapture
 
-  deploy:
-    # Build the wasm module and publish the demo to GitHub Pages.
-    # Nothing here needs a server: wasm-pack output is static.
-    needs: [core, wasm, lint, supply-chain]
-    if: github.ref == 'refs/heads/main'
+  build:
+    # Build the wasm module and the Pages artifact. This used to be one job with
+    # `deploy`, gated `if: github.ref == 'refs/heads/main'` -- so a pull request
+    # never ran it, and a PR that broke the deployed build learned about it only
+    # after merge. It now runs on every trigger as a gate job; only `deploy`
+    # below is main-only. Nothing here needs a server: wasm-pack output is static.
     runs-on: ubuntu-latest
     permissions:
       pages: write
@@ -344,15 +345,6 @@ jobs:
       # and is also what lets Sigstore mint a short-lived signing identity.
       attestations: write
       contents: read
-    # Two Pages deployments in flight at once fail each other. Queue rather
-    # than cancel: a superseded deploy still needs to finish releasing the
-    # environment lock.
-    concurrency:
-      group: pages
-      cancel-in-progress: false
-    environment:
-      name: github-pages
-      url: ${{ steps.pages.outputs.page_url }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@02cb101ec7c40f2c49e1d9714d64511d8e1b74de # master
@@ -381,6 +373,10 @@ jobs:
       #   gh attestation verify codetalker_wasm_bg.wasm \
       #     --repo systemslibrarian/crypto-lab-ablation-wire
       - name: Attest the module the browser runs
+        # Not on pull requests: a PR build is checked, never published, so
+        # there is nothing to attest -- and a Dependabot PR's token cannot
+        # write attestations.
+        if: github.event_name != 'pull_request'
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: web/pkg/codetalker_wasm_bg.wasm
@@ -395,6 +391,31 @@ jobs:
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: web
+
+  deploy:
+    # Publish what `build` uploaded. Needs every gate job -- the same list
+    # `dependabot-auto-merge` needs -- so a bump cannot merge past a gate that
+    # would later block this deploy. A pull request is gated, never published:
+    # `!= 'pull_request'` and NOT `== 'push'`, which would also skip the
+    # post-merge workflow_dispatch. The ref check keeps a hand-dispatched run on
+    # another branch from publishing, as the old fused job did.
+    needs: [core, msrv, lint, wasm, supply-chain, audit, cbom, secret-independence, fuzz, coverage, nist-vectors, build]
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+      contents: read
+    # Two Pages deployments in flight at once fail each other. Queue rather
+    # than cancel: a superseded deploy still needs to finish releasing the
+    # environment lock.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.pages.outputs.page_url }}
+    steps:
       - id: pages
         uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1
 
@@ -404,7 +425,7 @@ jobs:
   # overwhelmingly majors (@noble v2 dropped export subpaths, TypeScript 7,
   # vitest 4), so those still want a human.
   dependabot-auto-merge:
-    needs: [core, msrv, lint, wasm, supply-chain, audit, cbom, secret-independence, fuzz, coverage, nist-vectors]
+    needs: [core, msrv, lint, wasm, supply-chain, audit, cbom, secret-independence, fuzz, coverage, nist-vectors, build]
     if: github.event_name == 'pull_request' && github.actor == 'dependabot[bot]'
     runs-on: ubuntu-latest
     permissions:
