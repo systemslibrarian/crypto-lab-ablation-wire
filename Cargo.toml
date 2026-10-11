@@ -4,10 +4,15 @@ members = ["codetalker-core"]
 # codetalker-wasm is excluded from the default workspace build because it
 # only compiles for wasm32-unknown-unknown. Build it with:
 #   wasm-pack build codetalker-wasm --target web
-exclude = ["codetalker-wasm"]
+exclude = ["codetalker-wasm", "vendor/libcrux-platform-0.0.4"]
 
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/systemslibrarian/crypto-lab-ablation-wire"
+
+# Authenticated 0.0.4 with three CPUID unsafe blocks for Rust 1.85 on x86.
+# See vendor/libcrux-platform-0.0.4/UPSTREAM.json and docs/platform-patch.md.
+[patch.crates-io]
+libcrux-platform = { path = "vendor/libcrux-platform-0.0.4" }

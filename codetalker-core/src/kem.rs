@@ -298,3 +298,104 @@ pub fn backend(name: &str) -> Result<Box<dyn Kem>> {
         _ => Err(Error::Kem("unknown backend")),
     }
 }
+
+#[cfg(all(test, feature = "pq"))]
+mod hybrid_input_validation {
+    use super::*;
+    use libcrux_kem::{Algorithm, Error as CruxError};
+
+    // RUSTSEC-2026-0330/0331: exercise the actual dependency and the shipping
+    // X-Wing boundary. An error is required; catching a panic is not a repair.
+    const HYBRIDS: [Algorithm; 2] = [Algorithm::XWingKemDraft06, Algorithm::X25519MlKem768Draft00];
+
+    #[test]
+    fn hybrid_public_keys_reject_every_truncated_encoding() {
+        for algorithm in HYBRIDS {
+            let (_, public) = libcrux_kem::key_gen(algorithm, &mut os_rng::OsRng).unwrap();
+            let encoded = public.encode();
+            for length in 0..encoded.len() {
+                assert!(
+                    matches!(
+                        libcrux_kem::PublicKey::decode(algorithm, &encoded[..length]),
+                        Err(CruxError::InvalidPublicKey)
+                    ),
+                    "{algorithm:?} accepted a {length}-byte public key"
+                );
+            }
+            assert!(libcrux_kem::PublicKey::decode(algorithm, &encoded).is_ok());
+        }
+    }
+
+    #[test]
+    fn hybrid_private_keys_reject_every_truncated_encoding() {
+        for algorithm in HYBRIDS {
+            let (private, _) = libcrux_kem::key_gen(algorithm, &mut os_rng::OsRng).unwrap();
+            let encoded = private.encode();
+            for length in 0..encoded.len() {
+                assert!(
+                    matches!(
+                        libcrux_kem::PrivateKey::decode(algorithm, &encoded[..length]),
+                        Err(CruxError::InvalidPrivateKey)
+                    ),
+                    "{algorithm:?} accepted a {length}-byte private key"
+                );
+            }
+            assert!(libcrux_kem::PrivateKey::decode(algorithm, &encoded).is_ok());
+        }
+    }
+
+    #[test]
+    fn hybrid_encapsulation_rejects_wrong_seed_lengths() {
+        for algorithm in HYBRIDS {
+            let (_, public) = libcrux_kem::key_gen(algorithm, &mut os_rng::OsRng).unwrap();
+            for length in (0..64).chain([65, 96]) {
+                assert!(
+                    matches!(
+                        public.encapsulate_derand(&vec![0x42; length]),
+                        Err(CruxError::KeyGen)
+                    ),
+                    "{algorithm:?} accepted a {length}-byte seed"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn hybrid_valid_seed_round_trips_after_serialization() {
+        for algorithm in HYBRIDS {
+            let (private, public) = libcrux_kem::key_gen(algorithm, &mut os_rng::OsRng).unwrap();
+            let private = libcrux_kem::PrivateKey::decode(algorithm, &private.encode()).unwrap();
+            let public = libcrux_kem::PublicKey::decode(algorithm, &public.encode()).unwrap();
+            let (encapsulated, ciphertext) = public.encapsulate_derand(&[0x42; 64]).unwrap();
+            let ciphertext = libcrux_kem::Ct::decode(algorithm, &ciphertext.encode()).unwrap();
+            assert_eq!(
+                encapsulated.encode(),
+                ciphertext.decapsulate(&private).unwrap().encode()
+            );
+        }
+    }
+
+    #[test]
+    fn shipping_xwing_returns_errors_for_malformed_keys_and_ciphertext() {
+        let kem = XWingKem;
+        let (private, public) = kem.keygen().unwrap();
+        let (expected, ciphertext) = kem.encapsulate(&public).unwrap();
+        assert_eq!(
+            expected.as_bytes(),
+            kem.decapsulate(&private, &ciphertext).unwrap().as_bytes()
+        );
+        for length in [0, 1, 31, 32, 1183, public.0.len() - 1] {
+            assert!(kem.encapsulate(&PublicKey(public.0[..length].to_vec())).is_err());
+        }
+        for length in 0..private.0.len() {
+            assert!(kem
+                .decapsulate(&SecretKey(private.0[..length].to_vec()), &ciphertext)
+                .is_err());
+        }
+        for length in [0, 1, 31, 32, 1087, ciphertext.0.len() - 1] {
+            assert!(kem
+                .decapsulate(&private, &Ciphertext(ciphertext.0[..length].to_vec()))
+                .is_err());
+        }
+    }
+}

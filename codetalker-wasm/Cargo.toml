@@ -40,3 +40,7 @@ hex = "0.4"
 [profile.release]
 opt-level = "s"
 lto = true
+
+# This crate is excluded from the root workspace and resolves its own patch.
+[patch.crates-io]
+libcrux-platform = { path = "../vendor/libcrux-platform-0.0.4" }
