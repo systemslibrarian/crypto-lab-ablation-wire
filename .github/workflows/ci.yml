@@ -224,9 +224,10 @@ jobs:
     #
     # The intent: route libcrux's ring-element operations through
     # libcrux-secrets and have the compiler check secret independence. The
-    # obstacle: `libcrux-kem` 0.0.9 has no `check-secret-independence` feature,
-    # so with the mode enabled on `libcrux-ml-kem` its own callers no longer
-    # typecheck -- it passes `[u8; 32]` where `Secret<u8>` is now expected.
+    # obstacle: `libcrux-kem` 0.0.10 has no `check-secret-independence` feature,
+    # and `libcrux-ml-kem` 0.0.11 still has raw-byte KEM trait implementations
+    # where verification mode requires `Secret<u8>`. Updating the shipping KEM
+    # fixes its malformed-input advisories, not these typed-secret boundaries.
     # That is upstream code, not this crate's, and not fixable from here short
     # of bypassing libcrux-kem entirely.
     #
