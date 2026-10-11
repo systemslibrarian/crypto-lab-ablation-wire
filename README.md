@@ -280,10 +280,13 @@ functionally real and side-channel-wise it is not. Adversary A5 in
 
 **Secret independence is not currently checked, upstream will not allow it.**
 There is a `check-secret-independence` feature and a CI job that attempts it,
-and the job fails. `libcrux-ml-kem` supports the mode; `libcrux-kem` 0.0.9,
-which this crate calls through, does not — with the mode on, libcrux-kem's own
-calls stop typechecking because they pass `[u8; 32]` where `Secret<u8>` is now
-expected. Upstream code, not fixable here without bypassing libcrux-kem.
+and the job fails. `libcrux-ml-kem` 0.0.11 exposes the mode, but its KEM trait
+implementations still use raw bytes where verification requires `Secret<u8>`.
+`libcrux-kem` 0.0.10, which this crate calls through, does not expose a matching
+verification feature. The supported shipping dependency fixes malformed-input
+advisories; it does not fix this verification gap. A secret-preserving upstream
+API integration is still required. See [the narrowly scoped platform patch](docs/platform-patch.md)
+for the separate Rust 1.85 compatibility repair.
 
 The job is kept, failing and non-blocking, because deleting it would hide the
 gap. Earlier this was worse than broken: it named a feature on a package that

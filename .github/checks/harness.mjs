@@ -69,40 +69,86 @@ async function findChrome() {
 }
 
 /** Connect a minimal CDP client to the browser's first page target. */
-async function connect(port) {
+export async function connect(port, {
+  fetchImpl = fetch, WebSocketImpl = WebSocket, startupStatus = () => null,
+  startupTimeoutMs = 10000, commandTimeoutMs = 5000, pollMs = 100,
+} = {}) {
   let targets;
-  for (let i = 0; i < 100; i++) {
+  let lastError = '';
+  const deadline = Date.now() + startupTimeoutMs;
+  while (Date.now() < deadline) {
+    const stopped = startupStatus();
+    if (stopped) throw new Error('Chrome startup failed: ' + stopped);
     try {
-      targets = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+      const response = await fetchImpl(`http://127.0.0.1:${port}/json/list`, {
+        signal: AbortSignal.timeout(Math.max(1, Math.min(500, deadline - Date.now()))),
+      });
+      if (!response.ok) throw new Error('Chrome target endpoint HTTP ' + response.status);
+      targets = await response.json();
+      if (!Array.isArray(targets)) throw new Error('Chrome target response is not an array');
       if (targets.some((t) => t.type === "page")) break;
-    } catch { /* not up yet */ }
-    await new Promise((r) => setTimeout(r, 100));
+    } catch (error) { lastError = error.message; }
+    await new Promise((r) => setTimeout(r, pollMs));
   }
-  const target = targets?.find((t) => t.type === "page");
-  if (!target) throw new Error("Chrome came up with no page target");
+  const target = Array.isArray(targets) ? targets.find((t) => t.type === "page") : null;
+  if (!target) throw new Error('Chrome produced no page target before the startup deadline' +
+    (lastError ? ': ' + lastError : ''));
+  if (typeof target.webSocketDebuggerUrl !== 'string') throw new Error('Chrome page has no debugger URL');
 
-  const ws = new WebSocket(target.webSocketDebuggerUrl);
-  await new Promise((r, j) => { ws.onopen = r; ws.onerror = j; });
+  const ws = new WebSocketImpl(target.webSocketDebuggerUrl);
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Chrome debugger connection timed out')), commandTimeoutMs);
+      const finish = (fn, value) => { clearTimeout(timer); fn(value); };
+      ws.onopen = () => finish(resolve);
+      ws.onerror = () => finish(reject, new Error('Chrome debugger connection failed'));
+      ws.onclose = () => finish(reject, new Error('Chrome debugger closed before connecting'));
+    });
+  } catch (error) { ws.close(); throw error; }
 
   let id = 0;
   const pending = new Map();
   const logs = [];
+  let closed = false;
+  const failPending = (error) => {
+    closed = true;
+    logs.push('HARNESS ' + error.message);
+    for (const job of pending.values()) { clearTimeout(job.timer); job.reject(error); }
+    pending.clear();
+  };
+  ws.onclose = () => failPending(new Error('Chrome debugger disconnected'));
+  ws.onerror = () => { failPending(new Error('Chrome debugger transport failed')); ws.close(); };
   ws.onmessage = (m) => {
-    const msg = JSON.parse(m.data);
-    if (msg.id && pending.has(msg.id)) {
-      pending.get(msg.id)(msg.result);
-      pending.delete(msg.id);
-    } else if (msg.method === "Log.entryAdded" && msg.params.entry.level === "error") {
-      logs.push("LOG " + msg.params.entry.text);
-    } else if (msg.method === "Runtime.exceptionThrown") {
-      logs.push("EXC " + msg.params.exceptionDetails.text);
+    try {
+      const msg = JSON.parse(m.data);
+      if (msg.id && pending.has(msg.id)) {
+        const job = pending.get(msg.id);
+        clearTimeout(job.timer); pending.delete(msg.id);
+        if (msg.error) job.reject(new Error('Chrome CDP ' + job.method + ': ' + JSON.stringify(msg.error)));
+        else if (!msg.result || typeof msg.result !== 'object') job.reject(new Error('Malformed Chrome CDP response for ' + job.method));
+        else job.resolve(msg.result);
+      } else if (msg.method === "Log.entryAdded") {
+        if (!msg.params?.entry) throw new Error('Unreadable Chrome log event');
+        if (msg.params.entry.level === "error") logs.push("LOG " + msg.params.entry.text);
+      } else if (msg.method === "Runtime.exceptionThrown") {
+        if (!msg.params?.exceptionDetails) throw new Error('Unreadable Chrome exception event');
+        logs.push("EXC " + msg.params.exceptionDetails.text);
+      }
+    } catch (error) {
+      failPending(new Error('Unreadable Chrome debugger response: ' + error.message));
+      ws.close();
     }
   };
   const send = (method, params = {}) =>
-    new Promise((res) => {
+    new Promise((resolve, reject) => {
+      if (closed) { reject(new Error('Chrome debugger is closed')); return; }
       const n = ++id;
-      pending.set(n, res);
-      ws.send(JSON.stringify({ id: n, method, params }));
+      const timer = setTimeout(() => {
+        pending.delete(n); reject(new Error('Chrome CDP timed out: ' + method));
+      }, commandTimeoutMs);
+      pending.set(n, { resolve, reject, timer, method });
+      try { ws.send(JSON.stringify({ id: n, method, params })); }
+      catch (error) { clearTimeout(timer); pending.delete(n); reject(error); }
     });
 
   const ev = async (expression) => {
@@ -117,19 +163,23 @@ async function connect(port) {
     return r.result.value;
   };
 
-  await send("Log.enable");
-  await send("Runtime.enable");
-  await send("Page.enable");
-  await send("Network.enable");
+  try {
+    await send("Log.enable");
+    await send("Runtime.enable");
+    await send("Page.enable");
+    await send("Network.enable");
   // A rerun after editing index.html otherwise serves the previous copy, which
   // once produced a screenshot of a layout bug that had already been fixed.
-  await send("Network.setCacheDisabled", { cacheDisabled: true });
+    await send("Network.setCacheDisabled", { cacheDisabled: true });
   // A headless page whose window is not focused never dispatches focus or blur,
   // so `el.focus()` moves document.activeElement and fires no handler. Without
   // this every keyboard-reachability check below silently tests nothing.
-  await send("Emulation.setFocusEmulationEnabled", { enabled: true });
+    await send("Emulation.setFocusEmulationEnabled", { enabled: true });
+  } catch (error) { ws.close(); throw error; }
 
-  return { send, ev, logs, close: () => ws.close() };
+  return { send, ev, logs, assertHealthy: () => {
+    if (closed) throw new Error('Chrome debugger became unreadable: ' + logs.join('\n'));
+  }, close: () => ws.close() };
 }
 
 /**
@@ -234,6 +284,7 @@ export function reporter(title) {
  * `fn` receives { ev, send, goto, logs, base }.
  */
 export async function withPage(fn) {
+  const executable = await findChrome();
   const port = 8000 + (process.pid % 1000);
   const cdpPort = 9000 + (process.pid % 1000);
   const root = new URL("../../web/", import.meta.url).pathname;
@@ -241,7 +292,7 @@ export async function withPage(fn) {
 
   const server = await serve(root, port);
   const profile = await mkdtemp(join(tmpdir(), "aw-chrome-"));
-  const chrome = spawn(await findChrome(), [
+  const chrome = spawn(executable, [
     "--headless=new",
     `--remote-debugging-port=${cdpPort}`,
     `--user-data-dir=${profile}`,
@@ -251,11 +302,16 @@ export async function withPage(fn) {
     "--disable-dev-shm-usage",
     "--disable-gpu",
     "about:blank",
-  ], { stdio: "ignore" });
+  ], { stdio: ['ignore', 'ignore', 'pipe'] });
+  let startupOutput = '', spawnError = '';
+  chrome.stderr.on('data', data => { startupOutput = (startupOutput + data.toString()).slice(-4000); });
+  chrome.on('error', error => { spawnError = error.message; });
+  const startupStatus = () => spawnError || (chrome.exitCode !== null || chrome.signalCode !== null
+    ? `exit=${chrome.exitCode}, signal=${chrome.signalCode}; ${startupOutput}` : null);
 
   let client;
   try {
-    client = await connect(cdpPort);
+    client = await connect(cdpPort, { startupStatus });
     const goto = async (url, width = 1280, height = 900) => {
       await client.send("Emulation.setDeviceMetricsOverride", {
         width, height, deviceScaleFactor: 1, mobile: width < 500,
@@ -286,6 +342,10 @@ export async function withPage(fn) {
       throw new Error(`the console never appeared at ${url} after 12s`);
     };
     await fn({ ...client, goto, base });
+    client.assertHealthy();
+  } catch (error) {
+    throw new Error(error.message + `\nChrome executable: ${executable}\n` +
+      `exit=${chrome.exitCode}, signal=${chrome.signalCode}\n${startupOutput}`, { cause: error });
   } finally {
     client?.close();
     chrome.kill();
