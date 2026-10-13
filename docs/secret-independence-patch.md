@@ -18,10 +18,14 @@ Apache-2.0; the license text is at `LICENSE-APACHE`. Each vendor directory's
 scope, and modified files. The existing `libcrux-platform` 0.0.4 compatibility
 patch remains selected and unchanged.
 
-Unlisted files are preserved byte-for-byte from those crate archives, including
-their existing trailing whitespace. Run `git diff --check` against authored and
-declared-modified files separately rather than rewriting otherwise-unmodified
-upstream sources.
+The archives' `.cargo_vcs_info.json` packaging files are omitted after their
+exact source commit and path-in-VCS fields are retained in `UPSTREAM.json`.
+Crate-local `Cargo.lock` files are also omitted because Cargo ignores dependency
+lockfiles when these crates are selected through the workspace path patches.
+Each omission is declared in that crate's `UPSTREAM.json`; every other unlisted
+archive file is preserved byte-for-byte, including existing trailing
+whitespace. Run `git diff --check` against authored and declared-modified files
+separately rather than rewriting otherwise-unmodified upstream sources.
 
 ## Patch boundary
 

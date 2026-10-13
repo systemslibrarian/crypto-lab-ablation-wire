@@ -7,6 +7,10 @@
   "pathInVcs": "libcrux-ml-kem",
   "license": "Apache-2.0",
   "licenseFile": "../../LICENSE-APACHE",
+  "omittedArchiveFiles": {
+    ".cargo_vcs_info.json": "Cargo packaging metadata; its exact source commit and path-in-VCS values are retained in sourceCommit and pathInVcs above.",
+    "Cargo.lock": "Crate-local dependency lockfile; Cargo ignores dependency lockfiles when this crate is selected through the workspace path patch."
+  },
   "changes": "Adds a portable, secret-classified arrayref::Kem implementation for ML-KEM-512/768/1024. Randomness, CPA private keys, messages, coins, implicit-rejection values, selectors, and shared secrets remain libcrux-secrets values through SHA-3, sampling, polynomial encoding, re-encryption, and selection. Only specified public outputs and the public-key subsection embedded in a decapsulation key are declassified. Existing released APIs and malformed-input behavior remain present.",
   "modifiedFiles": [
     "Cargo.toml",
