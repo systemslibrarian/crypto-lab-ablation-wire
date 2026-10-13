@@ -7,6 +7,11 @@ target_dir="${TMPDIR:-/tmp}/ablation-secret-independence-controls"
 
 node "$repo_root/.github/checks/secret-independence-boundary.mjs"
 
+# The controls have their own lockfile. Populate that exact dependency graph
+# before making every positive and negative compilation offline, so a clean
+# runner cannot mistake an absent registry crate for an information-flow error.
+cargo fetch --quiet --locked --manifest-path "$manifest"
+
 CARGO_NET_OFFLINE=true CARGO_TARGET_DIR="$target_dir" \
     cargo check --quiet --locked --manifest-path "$manifest" --bin allowed
 
