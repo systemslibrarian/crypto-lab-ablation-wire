@@ -7,6 +7,10 @@
   "pathInVcs": "libcrux-kem",
   "license": "Apache-2.0",
   "licenseFile": "../../LICENSE-APACHE",
+  "omittedArchiveFiles": {
+    ".cargo_vcs_info.json": "Cargo packaging metadata; its exact source commit and path-in-VCS values are retained in sourceCommit and pathInVcs above.",
+    "Cargo.lock": "Crate-local dependency lockfile; Cargo ignores dependency lockfiles when this crate is selected through the workspace path patch."
+  },
   "changes": "Updates only the low-level X-Wing arrayref::Kem implementation to retain secret classification across seed expansion, ML-KEM/X25519 composition, shared-secret buffering, and the SHA3-256 combiner. Public keys and ciphertexts remain public. The existing libcrux-curve25519 primitive boundary is reused unchanged.",
   "modifiedFiles": [
     "src/kem.rs"

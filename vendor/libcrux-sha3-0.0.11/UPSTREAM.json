@@ -7,6 +7,10 @@
   "pathInVcs": "crates/algorithms/sha3",
   "license": "Apache-2.0",
   "licenseFile": "../../LICENSE-APACHE",
+  "omittedArchiveFiles": {
+    ".cargo_vcs_info.json": "Cargo packaging metadata; its exact source commit and path-in-VCS values are retained in sourceCommit and pathInVcs above.",
+    "Cargo.lock": "Crate-local dependency lockfile; Cargo ignores dependency lockfiles when this crate is selected through the workspace path patch."
+  },
   "changes": "Adds a separate portable secret-byte sponge API for SHA3-256, SHA3-512, SHAKE128, and SHAKE256. Message bytes, Keccak lanes, and output bytes remain libcrux-secrets values; control flow and indexing depend only on public lengths and round counters. Existing public-byte and SIMD APIs are unchanged.",
   "modifiedFiles": [
     "Cargo.toml",
