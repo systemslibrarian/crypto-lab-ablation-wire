@@ -7,6 +7,8 @@ primitives, with every layer independently switchable. The internal crates are
 The point is not to build a secure channel. It is to let a reader turn layers
 off and discover which one was actually load-bearing.
 
+**It teaches people to ask what each protection contributes, and to test what happens when it disappears.**
+
 ## The claim this crate tests
 
 | 1942 | here | module |
