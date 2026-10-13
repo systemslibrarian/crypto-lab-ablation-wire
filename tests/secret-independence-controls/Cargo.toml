@@ -1,0 +1,30 @@
+[workspace]
+
+[package]
+name = "secret-independence-compiler-controls"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+libcrux-secrets = { version = "=0.0.7", features = ["check-secret-independence"] }
+libcrux-sha3 = { path = "../../vendor/libcrux-sha3-0.0.11", features = ["check-secret-independence"] }
+
+[patch.crates-io]
+libcrux-platform = { path = "../../vendor/libcrux-platform-0.0.4" }
+
+[[bin]]
+name = "allowed"
+path = "allowed.rs"
+
+[[bin]]
+name = "secret-branch"
+path = "secret-branch.rs"
+
+[[bin]]
+name = "secret-index"
+path = "secret-index.rs"
+
+[[bin]]
+name = "raw-hash-boundary"
+path = "raw-hash-boundary.rs"

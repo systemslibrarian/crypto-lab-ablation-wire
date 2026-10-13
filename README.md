@@ -280,24 +280,19 @@ timing guarantees regardless of what this source says. A WASM build is
 functionally real and side-channel-wise it is not. Adversary A5 in
 [THREAT_MODEL.md](THREAT_MODEL.md) is explicitly out of scope.
 
-**Secret independence is not currently checked, upstream will not allow it.**
-There is a `check-secret-independence` feature and a CI job that attempts it,
-and the job fails. `libcrux-ml-kem` 0.0.11 exposes the mode, but its KEM trait
-implementations still use raw bytes where verification requires `Secret<u8>`.
-`libcrux-kem` 0.0.10, which this crate calls through, does not expose a matching
-verification feature. The supported shipping dependency fixes malformed-input
-advisories; it does not fix this verification gap. A secret-preserving upstream
-API integration is still required. See [the narrowly scoped platform patch](docs/platform-patch.md)
-for the separate Rust 1.85 compatibility repair.
+**Secret independence is checked at the Rust source boundary, not in emitted
+machine code.** The blocking `check-secret-independence` job uses a narrowly
+vendored portable ML-KEM/X-Wing path to retain `libcrux-secrets` types through
+randomness, private keys, shared secrets, hashing, serialization, composition,
+and implicit rejection. Equivalence tests cover ML-KEM-512/768/1024 and X-Wing;
+negative compiler controls require secret-dependent branches, indices, and raw
+hash boundaries to be rejected. See
+[the patch provenance and exact boundary](docs/secret-independence-patch.md).
 
-The job is kept, failing and non-blocking, because deleting it would hide the
-gap. Earlier this was worse than broken: it named a feature on a package that
-was not a direct dependency, failed instantly with "does not contain this
-feature", and was cited in the threat model as evidence of a check being
-performed. It now attempts the real thing and reports the real obstacle.
-
-Consequence worth knowing: **`cargo build --all-features` does not build**, for
-exactly this reason. Build the feature sets in the table above instead.
+This establishes that the checked Rust path obeys the configured type-level
+information-flow discipline. It does not establish constant-time machine code,
+audit the compiler, or change the WASM timing limitation above. The separate
+[platform patch](docs/platform-patch.md) remains selected and unchanged.
 
 **The two-time-pad recovery is bounded by the crib.** `session::two_time_pad`
 recovers exactly as far as the known plaintext reaches, and the test asserts
@@ -369,14 +364,14 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | | status |
 |---|---|
 | `default` (classical) | clean build, 0 warnings, **81/81 tests passing** |
-| `--no-default-features --features pq` | **80/80** — the pure post-quantum build |
-| `--no-default-features --features classical,pq` | **83/83**, both suites present |
+| `--no-default-features --features pq` | **90/90** — the pure post-quantum build, including typed-path equivalence |
+| `--no-default-features --features classical,pq` | **93/93**, both suites present, including typed-path equivalence |
 | MSRV, rustc 1.85 | builds `classical,pq` clean |
 | FIPS 203 vectors | 35 ML-KEM-768 decapsulation vectors verified |
 | FIPS 204 vectors | ML-DSA-65 signature verification, valid and invalid cases |
 | `cargo clippy --all-targets` | clean on every feature combination, and on `wasm32` |
 | `cargo deny --all-features check` | advisories, bans, licenses, sources — all ok |
-| Secret independence | **fails, upstream cannot support it** — see Limitations |
+| Secret independence | blocking typed build, ML-KEM/X-Wing equivalence and implicit-rejection tests, plus positive/negative compiler controls |
 | `cargo audit` | no vulnerabilities; one unmaintained transitive crate, below |
 | `wasm-pack build` | 700 KB module, driven end to end across every ablation |
 | Threat matrix | A1–A5 computed in `threat.rs`; every row of THREAT_MODEL.md asserted in `tests/ablation.rs` |

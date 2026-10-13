@@ -197,6 +197,8 @@ dependencies = [
  "libcrux-kem",
  "libcrux-ml-dsa",
  "libcrux-ml-kem",
+ "libcrux-sha3 0.0.11",
+ "libcrux-traits 0.0.9",
  "proptest",
  "rand_core 0.10.1",
  "rand_core 0.6.4",
@@ -669,8 +671,6 @@ dependencies = [
 [[package]]
 name = "libcrux-kem"
 version = "0.0.10"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31bf62e2a587002bf2ccc022015daeb8457e1e09269b3544aeec12243a3e9b74"
 dependencies = [
  "libcrux-curve25519",
  "libcrux-ecdh",
@@ -720,8 +720,6 @@ dependencies = [
 [[package]]
 name = "libcrux-ml-kem"
 version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4ceed00367748ec0b545bc4a7b0521f8c9fd476d02484340f0a95b0f45f828cd"
 dependencies = [
  "hax-lib 0.4.2",
  "libcrux-intrinsics 0.0.9",
@@ -808,12 +806,11 @@ dependencies = [
 [[package]]
 name = "libcrux-sha3"
 version = "0.0.11"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c8117e86e1f03417d8ebe50ed298c6ee0b05557783a75697d0c59a2ef2dcfc6"
 dependencies = [
  "hax-lib 0.4.2",
  "libcrux-intrinsics 0.0.9",
  "libcrux-platform 0.0.4",
+ "libcrux-secrets 0.0.7",
  "libcrux-traits 0.0.9",
 ]
 

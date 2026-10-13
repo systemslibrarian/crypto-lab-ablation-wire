@@ -1,0 +1,24 @@
+{
+  "package": "libcrux-ml-kem",
+  "version": "0.0.11",
+  "archiveUrl": "https://static.crates.io/crates/libcrux-ml-kem/libcrux-ml-kem-0.0.11.crate",
+  "archiveSha256": "4ceed00367748ec0b545bc4a7b0521f8c9fd476d02484340f0a95b0f45f828cd",
+  "sourceCommit": "42d68bd49b244b09bd02626c6ffa95e54dc64f91",
+  "pathInVcs": "libcrux-ml-kem",
+  "license": "Apache-2.0",
+  "licenseFile": "../../LICENSE-APACHE",
+  "omittedArchiveFiles": {
+    ".cargo_vcs_info.json": "Cargo packaging metadata; its exact source commit and path-in-VCS values are retained in sourceCommit and pathInVcs above.",
+    "Cargo.lock": "Crate-local dependency lockfile; Cargo ignores dependency lockfiles when this crate is selected through the workspace path patch."
+  },
+  "changes": "Adds a portable, secret-classified arrayref::Kem implementation for ML-KEM-512/768/1024. Randomness, CPA private keys, messages, coins, implicit-rejection values, selectors, and shared secrets remain libcrux-secrets values through SHA-3, sampling, polynomial encoding, re-encryption, and selection. Only specified public outputs and the public-key subsection embedded in a decapsulation key are declassified. Existing released APIs and malformed-input behavior remain present.",
+  "modifiedFiles": [
+    "Cargo.toml",
+    "Cargo.toml.orig",
+    "src/ind_cpa.rs",
+    "src/lib.rs",
+    "src/secret_independence.rs",
+    "src/serialize.rs",
+    "src/vector/portable.rs"
+  ]
+}
