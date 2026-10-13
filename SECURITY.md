@@ -69,12 +69,12 @@ are no released versions to backport to.
 ## What is checked, and what is not
 
 The [README's verification section](README.md#verification-status) is the
-authoritative list, including the parts that fail. Two worth repeating here:
+authoritative list. Two boundaries worth repeating here:
 
-- **Secret independence is not checked.** The feature and the CI job exist, the
-  job attempts the real check, and it fails on upstream code that cannot support
-  it. It is kept failing and non-blocking so the gap stays visible rather than
-  being deleted.
+- **Secret independence is a source-level check.** The blocking job retains
+  secret types across the vendored portable ML-KEM/X-Wing path and runs positive
+  and negative compiler controls. It does not establish constant-time emitted
+  machine code or side-channel resistance in a browser JIT.
 - **`cargo audit` reports one unmaintained transitive crate**
   (`proc-macro-error2`, RUSTSEC-2026-0173), reached through the
   formal-verification toolchain. It is a build-time proc-macro and contributes

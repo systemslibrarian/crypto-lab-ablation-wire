@@ -1,0 +1,63 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [0.0.10] (2026-10-07)
+
+### Fixed
+
+- [#1560](https://github.com/celabshq/libcrux/pull/1560): Reject malformed hybrid key encodings without panicking
+- [#1595](https://github.com/celabshq/libcrux/pull/1595): Reject invalid/short seed lengths in `PublicKey::encapsulate_derand` without panicking
+- [#1595](https://github.com/celabshq/libcrux/pull/1595): (Breaking) Return `Ss::MlKem512` variant instead of `Ss::MlKem768` variant when decapsulating `Ct::MlKem512` ciphertext
+
+### Changed
+
+- [#1584](https://github.com/celabshq/libcrux/pull/1584): Widened the RNG bound on `key_gen`, `PublicKey::encapsulate` from
+  `CryptoRng` to `TryCryptoRng` to support fallible RNGs
+
+## [0.0.9] (2026-07-15)
+
+### Changed
+
+- [#1534](https://github.com/celabshq/libcrux/pull/1534): Update dependencies: `libcrux-traits`, `libcrux-sha3`, `libcrux-curve25519`, `libcrux-ml-kem`, `libcrux-p256`, `libcrux-ecdh`
+
+## [0.0.8] (2026-05-13)
+
+### Changed
+
+- [#1434](https://github.com/celabshq/libcrux/pull/1434): Update dependencies: `libcrux-curve25519`
+- [#1433](https://github.com/celabshq/libcrux/pull/1433): Update dependencies: `libcrux-traits`, `libcrux-ml-kem`, `libcrux-p256`, `libcrux-curve25519`, `libcrux-sha3`, `libcrux-ecdh`
+- [#1412](https://github.com/celabshq/libcrux/pull/1412): Update dependencies: `libcrux-ecdh`
+- [#1385](https://github.com/celabshq/libcrux/pull/1385): Update trait bounds to use `rand` version 0.10
+
+## [0.0.7] (2026-03-19)
+
+### Changed
+
+- [#1368](https://github.com/celabshq/libcrux/pull/1368): Update dependencies: `libcrux-sha3`, `libcrux-ml-kem`
+
+## [0.0.6] (2026-02-12)
+
+### Changed
+
+- [#1324](https://github.com/celabshq/libcrux/pull/1324): Update dependencies: `libcrux-curve25519`, `libcrux-ecdh`, `libcrux-ml-kem`, `libcrux-traits`, `libcrux-p256`, `libcrux-sha3`
+
+## [0.0.5] (2026-01-22)
+
+- [#1297](https://github.com/celabshq/libcrux/pull/1297): Update dependencies
+- [#1280](https://github.com/celabshq/libcrux/pull/1280): Update dependencies `libcrux-sha3`, `libcrux-ml-kem`
+
+## [0.0.4] (2025-11-05)
+
+- [#1053](https://github.com/celabshq/libcrux/pull/1053): Add and implement KEM traits
+
+## [0.0.3] (2025-06-30)
+
+- [#920](https://github.com/celabshq/libcrux/pull/920):
+  - Drop support for XWingKyberDraft02, XWingKemDraft02, and X25519Kyber768Draft00
+  - Add support for XWingKemDraft06
+  - Add key gen and encaps derandomized functions
+- [#922](https://github.com/celabshq/libcrux/pull/922): Make `no_std` optional using default `std` feature
