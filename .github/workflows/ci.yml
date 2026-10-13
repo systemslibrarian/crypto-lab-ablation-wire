@@ -224,31 +224,27 @@ jobs:
           path: "**/*.cdx.json"
 
   secret-independence:
-    name: secret independence (known upstream breakage)
+    name: secret independence
     runs-on: ubuntu-latest
-    # Expected to fail, and kept so the failure stays visible.
-    #
-    # The intent: route libcrux's ring-element operations through
-    # libcrux-secrets and have the compiler check secret independence. The
-    # obstacle: `libcrux-kem` 0.0.10 has no `check-secret-independence` feature,
-    # and `libcrux-ml-kem` 0.0.11 still has raw-byte KEM trait implementations
-    # where verification mode requires `Secret<u8>`. Updating the shipping KEM
-    # fixes its malformed-input advisories, not these typed-secret boundaries.
-    # A coherent secret-preserving upstream API integration is still required;
-    # the shipping security and platform compatibility patches do not provide it.
-    #
-    # The previous version of this job was worse than broken: it named a
-    # feature on a package that was not a direct dependency, so it failed
-    # instantly with "does not contain this feature" while THREAT_MODEL.md
-    # cited it as evidence of a check being performed. It now genuinely
-    # attempts the check and genuinely reports that upstream cannot support it.
-    continue-on-error: true
+    # This is a blocking source-level information-flow check over the vendored
+    # portable ML-KEM/X-Wing path. The equivalence tests cover all three ML-KEM
+    # parameter sets, X-Wing, and implicit rejection. Negative compiler controls
+    # prove that the configured secret type rejects branches, indices, and raw
+    # hash boundaries driven by secret values. This does not make a claim about
+    # constant-time machine code; see docs/secret-independence-patch.md.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: dtolnay/rust-toolchain@7e38f4b43b4db5c8dd498af069a4f6196df1d067 # master
         with:
           toolchain: stable
-      - run: cargo build -p codetalker-core --features check-secret-independence
+      - name: Build typed ML-KEM and X-Wing boundaries
+        run: cargo build -p codetalker-core --features check-secret-independence
+      - name: Match released KEM behavior
+        run: >
+          cargo test -p codetalker-core --features check-secret-independence
+          --test secret_independence -- --nocapture
+      - name: Reject secret-dependent compiler controls
+        run: .github/checks/secret-independence-negative.sh
 
   fuzz:
     name: fuzz (smoke, ${{ matrix.target }})
@@ -294,9 +290,8 @@ jobs:
       - name: Fetch known-answer vectors
         run: .github/fetch-vectors.sh
 
-      # `classical,pq` rather than --all-features, because --all-features pulls
-      # `check-secret-independence` and that does not build -- see the job of the
-      # same name. This is the widest feature set that compiles.
+      # Coverage measures the shipping classical/PQ APIs. The separate blocking
+      # secret-independence job exercises the typed verification-only path.
       - name: Measure
         run: |
           cargo llvm-cov -p codetalker-core \
