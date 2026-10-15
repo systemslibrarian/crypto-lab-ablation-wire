@@ -71,7 +71,25 @@ async function findChrome() {
 /** Connect a minimal CDP client to the browser's first page target. */
 export async function connect(port, {
   fetchImpl = fetch, WebSocketImpl = WebSocket, startupStatus = () => null,
-  startupTimeoutMs = 10000, commandTimeoutMs = 5000, pollMs = 100,
+  /* 60s, and the number is a HANG DETECTOR rather than an estimate.
+   *
+   * This was 10000, which is not a budget a cold Chrome reliably meets.
+   * Measured 2026-10-15: a fresh `--user-data-dir` profile took 5936 ms to
+   * expose a page target on an unloaded developer machine. That is a 1.7x
+   * margin, and a throttled runner spends it -- `wasm` failed twice in a row on
+   * `Chrome produced no page target before the startup deadline: fetch failed`,
+   * on a commit whose only change was two pinned action SHAs, while every
+   * pull_request and push run of the same job passed.
+   *
+   * Raising it cannot mask a broken browser, which is the only reason this is
+   * safe: a Chrome that dies or refuses to start is caught by `startupStatus()`
+   * on EVERY poll, one line below, and throws `Chrome startup failed` with its
+   * exit code and stderr immediately. The deadline bounds only the wait on a
+   * LIVE browser that has not opened its debug port yet. So the old value was
+   * not buying strictness, it was converting slow starts into red gates -- and
+   * this job is the only thing standing between a broken wasm artifact and
+   * main, so a false red here is expensive. */
+  startupTimeoutMs = 60000, commandTimeoutMs = 5000, pollMs = 100,
 } = {}) {
   let targets;
   let lastError = '';
