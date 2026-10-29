@@ -6,7 +6,7 @@ edition.workspace = true
 license.workspace = true
 repository.workspace = true
 # The `pq` feature pulls libcrux, which uses edition 2024.
-rust-version = "1.85"
+rust-version = "1.87"
 
 [features]
 # Classical-only KEM. Compiles everywhere, including older toolchains.

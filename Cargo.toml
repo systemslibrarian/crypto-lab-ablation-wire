@@ -18,7 +18,8 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/systemslibrarian/crypto-lab-ablation-wire"
 
-# Authenticated 0.0.4 with three CPUID unsafe blocks for Rust 1.85 on x86.
+# Authenticated 0.0.4 with three CPUID unsafe blocks. Still required on 1.87:
+# the intrinsics are unsafe to call in any modern rustc, not just 1.85.
 # See vendor/libcrux-platform-0.0.4/UPSTREAM.json and docs/platform-patch.md.
 [patch.crates-io]
 libcrux-kem = { path = "vendor/libcrux-kem-0.0.10" }

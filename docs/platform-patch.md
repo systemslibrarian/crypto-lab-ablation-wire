@@ -1,9 +1,15 @@
-# Rust 1.85 platform compatibility
+# libcrux-platform compatibility patch
+
+> Measured 2026-10-29: this is NOT a 1.85 artefact. Removing the patch and
+> building on 1.87 returns the same `E0133` on all three intrinsics (see the
+> MSRV job on PR #26). The heading and the sentence below said "Rust 1.85
+> requires", which read as though raising the floor would retire it. It will
+> go when upstream ships a fixed release; 0.0.4 is still the newest published.
 
 The supported fix for RUSTSEC-2026-0330 and RUSTSEC-2026-0331 is libcrux-kem
 0.0.10. Its ML-KEM dependency introduces libcrux-platform 0.0.4. That release
-calls three x86 CPUID intrinsics without explicit unsafe blocks, which Rust
-1.85 requires. The Mac arm64 build does not compile that module. Actual Linux
+calls three x86 CPUID intrinsics without explicit unsafe blocks, which every
+rustc from 1.85 onward requires. The Mac arm64 build does not compile that module. Actual Linux
 PR CI and an independent Rust 1.85 x86 cross-check both reproduced E0133.
 
 `vendor/libcrux-platform-0.0.4` contains the authenticated published crate,
