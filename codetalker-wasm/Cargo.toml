@@ -8,7 +8,7 @@ license = "MIT OR Apache-2.0"
 # workspace, so `.workspace = true` has no workspace to read from here. Same
 # reason `lint` has to reach it with --manifest-path.
 repository = "https://github.com/systemslibrarian/crypto-lab-ablation-wire"
-rust-version = "1.85"
+rust-version = "1.87"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -43,4 +43,3 @@ lto = true
 
 # This crate is excluded from the root workspace and resolves its own patch.
 [patch.crates-io]
-libcrux-platform = { path = "../vendor/libcrux-platform-0.0.4" }

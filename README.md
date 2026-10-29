@@ -226,8 +226,17 @@ aliased direct dependency in `codetalker-wasm/Cargo.toml` that exists only to
 enable it. If a wasm build ever fails with "the wasm32/64-unknown-unknown are not
 supported by default", that dependency is what went missing.
 
-MSRV is 1.85 with `pq` enabled, because libcrux uses edition 2024. The default
-feature set builds on considerably older toolchains.
+MSRV is 1.87 with `pq` enabled. It was 1.85, set because libcrux uses edition
+2024, and moved on 2026-10-29 to take the fix for RUSTSEC-2026-0385: `ctutils`
+0.4.2 generates masks and compares `u128` values in non-constant time, and the
+only patched release, 0.4.4, requires rustc 1.87. Cargo refuses the upgrade
+under the old floor rather than silently taking it, so the floor had to move
+for the advisory to be cleared at all. The default feature set still builds on
+considerably older toolchains.
+
+Raising it also retired `vendor/libcrux-platform-0.0.4`, which existed only to
+wrap three CPUID intrinsics in `unsafe` blocks for the 1.85 build, along with
+the offline verifier that proved that patch was an honest reversal of upstream.
 
 ## Known-answer tests
 
@@ -291,8 +300,7 @@ hash boundaries to be rejected. See
 
 This establishes that the checked Rust path obeys the configured type-level
 information-flow discipline. It does not establish constant-time machine code,
-audit the compiler, or change the WASM timing limitation above. The separate
-[platform patch](docs/platform-patch.md) remains selected and unchanged.
+audit the compiler, or change the WASM timing limitation above.
 
 **The two-time-pad recovery is bounded by the crib.** `session::two_time_pad`
 recovers exactly as far as the known plaintext reaches, and the test asserts
@@ -366,7 +374,7 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | `default` (classical) | clean build, 0 warnings, **81/81 tests passing** |
 | `--no-default-features --features pq` | **90/90** — the pure post-quantum build, including typed-path equivalence |
 | `--no-default-features --features classical,pq` | **93/93**, both suites present, including typed-path equivalence |
-| MSRV, rustc 1.85 | builds `classical,pq` clean |
+| MSRV, rustc 1.87 | builds `classical,pq` clean |
 | FIPS 203 vectors | 35 ML-KEM-768 decapsulation vectors verified |
 | FIPS 204 vectors | ML-DSA-65 signature verification, valid and invalid cases |
 | `cargo clippy --all-targets` | clean on every feature combination, and on `wasm32` |
