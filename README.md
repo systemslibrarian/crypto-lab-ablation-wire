@@ -234,9 +234,14 @@ under the old floor rather than silently taking it, so the floor had to move
 for the advisory to be cleared at all. The default feature set still builds on
 considerably older toolchains.
 
-Raising it also retired `vendor/libcrux-platform-0.0.4`, which existed only to
-wrap three CPUID intrinsics in `unsafe` blocks for the 1.85 build, along with
-the offline verifier that proved that patch was an honest reversal of upstream.
+`vendor/libcrux-platform-0.0.4` stays, and the reason is now measured rather
+than assumed. That patch wraps three CPUID intrinsics in `unsafe` blocks, and
+the note beside it read as though 1.85 were what demanded them. Removing it on
+1.87 was tried in #26 and the MSRV job returned the same `E0133: call to unsafe
+function __cpuid is unsafe and requires unsafe function or block`. The
+intrinsics are unsafe to call in any modern rustc, so the patch is not a 1.85
+artefact and raising the floor does not retire it. It can only go when upstream
+ships a fixed release; 0.0.4 is still the newest on crates.io.
 
 ## Known-answer tests
 

@@ -6,6 +6,7 @@ members = ["codetalker-core"]
 #   wasm-pack build codetalker-wasm --target web
 exclude = [
     "codetalker-wasm",
+    "vendor/libcrux-platform-0.0.4",
     "vendor/libcrux-kem-0.0.10",
     "vendor/libcrux-ml-kem-0.0.11",
     "vendor/libcrux-sha3-0.0.11",
@@ -17,7 +18,11 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/systemslibrarian/crypto-lab-ablation-wire"
 
+# Authenticated 0.0.4 with three CPUID unsafe blocks. Still required on 1.87:
+# the intrinsics are unsafe to call in any modern rustc, not just 1.85.
+# See vendor/libcrux-platform-0.0.4/UPSTREAM.json and docs/platform-patch.md.
 [patch.crates-io]
 libcrux-kem = { path = "vendor/libcrux-kem-0.0.10" }
 libcrux-ml-kem = { path = "vendor/libcrux-ml-kem-0.0.11" }
+libcrux-platform = { path = "vendor/libcrux-platform-0.0.4" }
 libcrux-sha3 = { path = "vendor/libcrux-sha3-0.0.11" }

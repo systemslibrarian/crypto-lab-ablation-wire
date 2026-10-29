@@ -116,8 +116,11 @@ jobs:
       - name: Documents point at things that exist
         run: node .github/checks/links.mjs
 
-      - name: Browser-verification negative controls
-        run: node --test .github/checks/harness.test.mjs
+      - name: Authenticated platform compatibility patch
+        run: node .github/checks/platform-patch.mjs
+
+      - name: Platform and browser-verification negative controls
+        run: node --test .github/checks/platform-patch.test.mjs .github/checks/harness.test.mjs
 
   wasm:
     runs-on: ubuntu-latest
