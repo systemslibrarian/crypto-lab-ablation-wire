@@ -386,7 +386,7 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | `cargo deny --all-features check` | advisories, bans, licenses, sources — all ok |
 | Secret independence | blocking typed build, ML-KEM/X-Wing equivalence and implicit-rejection tests, plus positive/negative compiler controls |
 | `cargo audit` | no vulnerabilities; one unmaintained transitive crate, below |
-| `wasm-pack build` | 700 KB module, driven end to end across every ablation |
+| `wasm-pack build` | 750 kB module, driven end to end across every ablation |
 | Threat matrix | A1–A5 computed in `threat.rs`; every row of THREAT_MODEL.md asserted in `tests/ablation.rs` |
 | Guided lab | 5 experiments and 7 presets in `lab.rs`; every declared outcome run through the real channel in `tests/ablation.rs` |
 | Layer captions | 6 panels in `explain.rs`, each carrying the configuration that demonstrates it; every "show me" asserted to produce the verdict its caption claims |
@@ -402,7 +402,7 @@ Measured on rustc 1.97.1, aarch64-apple-darwin.
 | Scheduled fuzzing | nightly, 20 min per target, against a corpus cached between runs — demonstrated: the second run restored 169 seeds and libFuzzer reported them |
 | Line coverage | **83.22%** (82.15% region, 75.23% function), floored at 80% in CI |
 | Build provenance | the published wasm module is signed; `gh attestation verify` checks it |
-| Module size | 750 kB, budgeted at 900 kB by `check-artifact.sh` |
+| Module size | 750 kB — 750,170 bytes built on this toolchain, 751,482 bytes as published on 15 November 2026 — budgeted at 900 kB by `check-artifact.sh` |
 | Actions pinned | every workflow action pinned to a commit SHA, Dependabot moves them |
 | `forbid(unsafe_code)` | enforced by the compiler, not asserted in prose |
 | RustCrypto 0.11 / dalek 3.0 | migrated; every published vector still reproduces byte for byte |
